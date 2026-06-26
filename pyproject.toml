@@ -1,8 +1,9 @@
 [project]
 name = "pyvauto"
 version = "0.1.0"
-description = "Add your description here"
+description = "Emacs verilog-mode-style AUTO expansion (AUTOINST/AUTOARG/AUTOWIRE/...) for Verilog & SystemVerilog, in pure Python — with a Vim plugin."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.13"
 dependencies = []
 

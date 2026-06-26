@@ -12,3 +12,6 @@ verible-*/
 *.json
 *.tree
 *.log
+
+# macOS
+.DS_Store
