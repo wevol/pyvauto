@@ -2,6 +2,8 @@
 
 **English** | [繁體中文](README.zh-TW.md)
 
+[![CI](https://github.com/wevol/pyvauto/actions/workflows/ci.yml/badge.svg)](https://github.com/wevol/pyvauto/actions/workflows/ci.yml)
+
 A Python Verilog automation tool that brings Emacs `verilog-mode`-style AUTO expansion to your editor. pyvauto is **built for Vim** (a Vim plugin is included): you get one-keystroke AUTOINST / AUTOARG / AUTOWIRE expansion without depending on Emacs. The core is a pure-Python CLI, so it also runs standalone from the command line or in CI. Other editors (e.g. VS Code) have no dedicated plugin yet — there you invoke the CLI from a terminal and reload the file.
 
 ## Features

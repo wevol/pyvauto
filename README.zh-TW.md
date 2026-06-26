@@ -2,6 +2,8 @@
 
 [English](README.md) | **繁體中文**
 
+[![CI](https://github.com/wevol/pyvauto/actions/workflows/ci.yml/badge.svg)](https://github.com/wevol/pyvauto/actions/workflows/ci.yml)
+
 Python 版本的 Verilog 自動化工具，提供類似 Emacs `verilog-mode` 的自動擴展功能。本工具**專為 Vim 設計**（內附 Vim 插件），讓你不必依賴 Emacs，也能在 Vim 中以一個快捷鍵完成 AUTOINST / AUTOARG / AUTOWIRE 等自動擴展。本體是純 Python CLI，因此也能獨立從命令列執行、或接進 CI；其他編輯器（如 VS Code）目前沒有專屬插件，需自行在終端機呼叫 CLI 再重新載入檔案。
 
 ## 功能特點
