@@ -17,11 +17,12 @@ Python 版本的 Verilog 自動化工具，提供類似 Emacs `verilog-mode` 的
 ```bash
 # 克隆或下載本專案
 cd pyvauto
-
-# 本體零依賴，核心功能僅需 Python 標準庫 (Python 3.6.8+)
-# 若要跑測試，建議使用 uv 建立環境：
-uv sync
 ```
+
+- **執行本工具**：`pyvauto.py` 零外部依賴、只用 Python 標準庫，**相容 Python 3.6.8+**
+  （所以能用舊版系統 Python，例如透過 Vim 呼叫）。直接 `python pyvauto.py ...` 即可。
+- **開發 / 跑測試**：本 uv 專案的環境鎖定在 **Python 3.13**（`pyproject.toml` 的 `requires-python`
+  與 `uv.lock` 為此設定，pytest 也需要較新的 Python）。執行 `uv sync` 建立環境即可。
 
 ## Vim 整合（主要用途）
 

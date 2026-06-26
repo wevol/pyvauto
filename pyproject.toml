@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Emacs verilog-mode-style AUTO expansion (AUTOINST/AUTOARG/AUTOWIRE/...) for Verilog & SystemVerilog, in pure Python — with a Vim plugin."
 readme = "README.md"
 license = "MIT"
+# Dev/test environment target. The standalone pyvauto.py itself runs on
+# Python 3.6.8+ (stdlib only); this pin is for the uv-managed dev env + pytest.
 requires-python = ">=3.13"
 dependencies = []
 
