@@ -966,7 +966,7 @@ class VerilogExpander:
             # list, not accumulate duplicates after the tag.
             new_paren = re.sub(
                 r"/\*AUTOSENSE\*/.*",
-                lambda _m: f"/*AUTOSENSE*/{sig_list}",
+                f"/*AUTOSENSE*/{sig_list}",
                 paren_content,
                 flags=re.IGNORECASE | re.DOTALL,
             )

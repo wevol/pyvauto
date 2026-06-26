@@ -21,8 +21,13 @@ FIXTURE_DIR = Path(__file__).parent
 SV_FIXTURES = sorted(FIXTURE_DIR.glob("*.sv"))
 
 
-def _make_expander() -> VerilogExpander:
-    """建立索引整個 tests/ 目錄的 expander，模擬 CLI 對 cwd 的索引行為。"""
+@pytest.fixture(scope="module")
+def expander() -> VerilogExpander:
+    """索引整個 tests/ 目錄的 expander，模擬 CLI 對 cwd 的索引行為。
+
+    用 module scope 只索引一次：expand_all 是純 string→string、不會變動
+    project，故可安全地在所有參數化案例間共用，避免每個案例重walk 整個目錄。
+    """
     project = VerilogProject()
     project.add_directory(str(FIXTURE_DIR))
     return VerilogExpander(project)
@@ -34,10 +39,8 @@ def test_fixtures_present():
 
 
 @pytest.mark.parametrize("sv_path", SV_FIXTURES, ids=lambda p: p.name)
-def test_fixture_expansion_is_idempotent(sv_path):
+def test_fixture_expansion_is_idempotent(expander, sv_path):
     """每個 .sv fixture 經 expand_all 後應可重複執行而不再變動。"""
-    expander = _make_expander()
-
     content = sv_path.read_text(encoding="utf-8")
     once = expander.expand_all(content, str(sv_path))
     twice = expander.expand_all(once, str(sv_path))
