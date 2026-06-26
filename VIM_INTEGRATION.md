@@ -1,170 +1,173 @@
-# Vim 整合使用說明
+# Vim Integration Guide
 
-## 問題解決
+## The problem it solves
 
-如果您的 Vim 只編譯了 Python 2.7 支持，無法直接執行 Python 3 程式碼，本專案提供了**外部命令調用方案**，讓 Vim 調用系統的 Python 3 來執行 `pyvauto.py`。
+If your Vim was built with only Python 2.7 support and can't run Python 3 code
+directly, this project ships an **external-command approach**: Vim shells out to
+your system's Python 3 to run `pyvauto.py`.
 
 ---
 
-## Python 版本支援
+## Python version support
 
-`pyvauto.py` 現在支援：
+`pyvauto.py` runs on:
 - ✅ Python 3.6.8+
 - ✅ Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
 
-**已驗證兼容性**：
-- 使用 `typing.Optional` 取代 `|` union 運算符
-- 使用 `typing.List`, `typing.Set` 作為返回值類型
-- 所有標準庫功能在 Python 3.6+ 都可用
+**Compatibility notes:**
+- Uses `typing.Optional` instead of the `|` union operator.
+- Uses `typing.List` / `typing.Set` for return-type hints.
+- Relies only on standard-library features available since Python 3.6.
+
+> The standalone tool targets 3.6.8+. The project's own dev/test environment
+> (uv + pytest) targets Python 3.13 — see the main README.
 
 ---
 
-## 安裝步驟
+## Installation
 
-### 1. 確認 Python 3 可用
+### 1. Confirm Python 3 is available
 
 ```bash
-# 檢查版本
-python --version   # 應該顯示 Python 3.6.8 或更高
-
-# 如果上面是 Python 2.x，試試
+python --version    # should report Python 3.6.8 or newer
+# if the above is Python 2.x, try:
 python3 --version
 ```
 
-### 2. 安裝 Vim 插件
+### 2. Install the Vim plugin
 
-將整個專案目錄放到 Vim 的 runtimepath：
+Add the project directory to Vim's `runtimepath`:
 
 ```vim
-" 在 .vimrc 中添加
-set runtimepath+=D:/code/PYTHON/pyvauto
+" in your .vimrc
+set runtimepath+=/path/to/pyvauto
 ```
 
-或者手動複製插件文件：
+Or copy the plugin file manually:
 
 ```bash
-# Linux/Mac
+# Linux/macOS
 cp plugin/verilog_auto.vim ~/.vim/plugin/
 
 # Windows
 copy plugin\verilog_auto.vim %USERPROFILE%\vimfiles\plugin\
 ```
 
-### 3. 配置（可選）
+### 3. Configuration (optional)
 
-在 `.vimrc` 中自訂設定：
+Customize in your `.vimrc`:
 
 ```vim
-" 如果 Python 執行檔不是 'python'（例如是 'python3'）
+" if your Python 3 executable isn't 'python' (e.g. it's 'python3')
 let g:verilog_auto_python = 'python3'
 
-" 如果 pyvauto.py 路徑需要明確指定
-let g:verilog_auto_script = 'D:/code/PYTHON/pyvauto/pyvauto.py'
+" if pyvauto.py needs an explicit path
+let g:verilog_auto_script = '/path/to/pyvauto/pyvauto.py'
 
-" 啟用保存時自動擴展（可選）
+" expand automatically on save (optional)
 let g:verilog_auto_on_save = 1
 
-" 禁用預設快捷鍵（如果想自訂）
+" disable the default mappings (if you want your own)
 let g:verilog_auto_no_mappings = 1
 ```
 
 ---
 
-## 使用方式
+## Usage
 
-### 方法 1：快捷鍵
+### Option 1: key mappings
 
-在 Verilog 檔案 (`.v` 或 `.sv`) 中：
+In a Verilog file (`.v` or `.sv`):
 
-- **按 `\va`** (反斜線 + va)
-- **或按 `F5`**
+- press **`\va`** (backslash + va)
+- or press **`F5`**
 
-### 方法 2：命令
+### Option 2: command
 
 ```vim
 :VerilogAuto
 ```
 
-### 工作流程
+### Workflow
 
-1. 在 Verilog 檔案中添加自動化標籤（如 `/*AUTOINST*/`）
-2. 按 `\va` 或 `F5`
-3. 插件會：
-   - 保存當前檔案
-   - 調用外部 Python 3 執行 `pyvauto.py`
-   - 自動重新載入檔案
-   - 顯示結果訊息
+1. Add an AUTO tag (e.g. `/*AUTOINST*/`) in your Verilog file.
+2. Press `\va` or `F5`.
+3. The plugin will:
+   - save the current file
+   - call the external Python 3 to run `pyvauto.py`
+   - reload the file automatically
+   - show a result message
 
 ---
 
-## 自訂快捷鍵
+## Custom key mappings
 
-如果想使用不同的快捷鍵：
+To use a different shortcut:
 
 ```vim
-" 禁用預設快捷鍵
+" disable the default mappings
 let g:verilog_auto_no_mappings = 1
 
-" 自訂為 <Leader>e（例如 \e）
+" map to <Leader>e (e.g. \e)
 nnoremap <silent> <Leader>e :VerilogAuto<CR>
 
-" 或使用其他功能鍵
+" or use another function key
 nnoremap <silent> <F9> :VerilogAuto<CR>
 ```
 
 ---
 
-## 故障排除
+## Troubleshooting
 
-### 錯誤：找不到 Python
-
-```vim
-" 明確指定 Python 完整路徑
-let g:verilog_auto_python = 'C:/Python36/python.exe'
-```
-
-### 錯誤：找不到 pyvauto.py
+### Error: Python not found
 
 ```vim
-" 使用絕對路徑
-let g:verilog_auto_script = 'D:/code/PYTHON/pyvauto/pyvauto.py'
+" specify the full path to the Python executable
+let g:verilog_auto_python = '/usr/bin/python3'   " or e.g. C:/Python313/python.exe on Windows
 ```
 
-### 檢查配置
+### Error: pyvauto.py not found
 
-在 Vim 中執行：
+```vim
+" use an absolute path
+let g:verilog_auto_script = '/path/to/pyvauto/pyvauto.py'
+```
+
+### Check the configuration
+
+Run inside Vim:
 
 ```vim
 :echo g:verilog_auto_python
 :echo g:verilog_auto_script
 ```
 
-確認路徑正確。
+to confirm the paths are correct.
 
 ---
 
-## 優勢
+## Why this approach
 
-✅ **繞過 Vim Python 版本限制** - 使用系統 Python 3
-✅ **零依賴** - 無需安裝第三方套件
-✅ **跨平台** - Windows、Linux、Mac 都可用
-✅ **向後兼容** - Python 3.6.8+ 都支援
-✅ **簡單整合** - 一個快捷鍵完成所有擴展
+✅ **Bypasses Vim's Python version limit** — uses the system Python 3
+✅ **Zero dependencies** — no third-party packages required
+✅ **Cross-platform** — works on Windows, Linux, and macOS
+✅ **Backward compatible** — supports Python 3.6.8+
+✅ **Simple integration** — one keystroke runs every expansion
 
 ---
 
-## 測試
+## Testing
 
-執行測試確保一切正常：
+Run the test suite to confirm everything works:
 
 ```bash
-cd D:/code/PYTHON/pyvauto
+cd /path/to/pyvauto
 
-# 執行測試
+# run the tests
 python -m pytest tests/ -v
 
-# 手動測試
+# manual test
 python pyvauto.py tests/test_top.sv
 ```
 
-所有測試應該通過。
+All tests should pass.
