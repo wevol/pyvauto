@@ -1,5 +1,5 @@
 """
-核心功能測試 - 確保 pyautocomplete 核心邏輯正確運作
+核心功能測試 - 確保 pyvauto 核心邏輯正確運作
 
 這些測試用於驗證：
 1. 解析器能正確解析 Verilog 模組
@@ -13,7 +13,7 @@ from pathlib import Path
 # 添加專案根目錄到 sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from pyautocomplete import (
+from pyvauto import (
     VerilogPort,
     VerilogModule,
     RegexVerilogParser,
@@ -507,7 +507,7 @@ class TestBugFixes:
 
     def test_strip_comments_preserves_string_literals(self):
         """strip_comments_safely 不能吃掉字串內的 `//` 或 `/* */`"""
-        from pyautocomplete import strip_comments_safely
+        from pyvauto import strip_comments_safely
         src = '$display("http://example.com /* not a comment */");'
         out = strip_comments_safely(src)
         assert "http://example.com" in out

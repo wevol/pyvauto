@@ -1,6 +1,6 @@
 " ============================================================================
 " Verilog Auto-Expansion Plugin
-" 使用外部 Python 3 調用 pyautocomplete.py
+" 使用外部 Python 3 調用 pyvauto.py
 " ============================================================================
 
 " 防止重複載入
@@ -14,10 +14,10 @@ if !exists('g:verilog_auto_python')
     let g:verilog_auto_python = 'python3'  " Windows 通常是 'python'，Linux/Mac 可能是 'python3'
 endif
 
-" 設定 pyautocomplete.py 路徑（可自訂）
+" 設定 pyvauto.py 路徑（可自訂）
 if !exists('g:verilog_auto_script')
     " 預設假設腳本在此插件的父目錄
-    let g:verilog_auto_script = expand('<sfile>:p:h:h') . '/plugin/pyautocomplete.py'
+    let g:verilog_auto_script = expand('<sfile>:p:h:h') . '/plugin/pyvauto.py'
 endif
 
 " 主要擴展函數
@@ -84,8 +84,8 @@ endif
 " " 設定 Python 執行檔（如果不在 PATH 中）
 " let g:verilog_auto_python = 'python3'
 "
-" " 設定 pyautocomplete.py 的路徑（如果不在預設位置）
-" let g:verilog_auto_script = '/autocomplete-vim/pyautocomplete.py'
+" " 設定 pyvauto.py 的路徑（如果不在預設位置）
+" let g:verilog_auto_script = '/pyvauto/pyvauto.py'
 "
 " " 啟用自動保存時擴展（預設關閉）
 " let g:verilog_auto_on_save = 1

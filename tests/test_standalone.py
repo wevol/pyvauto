@@ -1,7 +1,7 @@
 """
-測試單一檔案執行 - 驗證 pyautocomplete.py 無需外部模組即可運作
+測試單一檔案執行 - 驗證 pyvauto.py 無需外部模組即可運作
 
-這個測試會失敗 (RED)，因為目前 pyautocomplete.py 依賴 parser.py。
+這個測試會失敗 (RED)，因為目前 pyvauto.py 依賴 parser.py。
 當我們完成合併後，這個測試應該會通過 (GREEN)。
 """
 
@@ -11,46 +11,46 @@ from pathlib import Path
 import importlib.util
 
 
-def test_pyautocomplete_is_standalone():
+def test_pyvauto_is_standalone():
     """
-    測試 pyautocomplete.py 可以單獨運作，不依賴 parser.py
+    測試 pyvauto.py 可以單獨運作，不依賴 parser.py
 
-    這個測試目前應該失敗 (RED)，因為 pyautocomplete.py
+    這個測試目前應該失敗 (RED)，因為 pyvauto.py
     在第 8 行: from parser import VerilogModule, RegexVerilogParser
     """
     project_root = Path(__file__).parent.parent
-    pyautocomplete_path = project_root / "pyautocomplete.py"
+    pyvauto_path = project_root / "pyvauto.py"
 
-    # 讀取 pyautocomplete.py 的內容
-    with open(pyautocomplete_path, "r", encoding="utf-8") as f:
+    # 讀取 pyvauto.py 的內容
+    with open(pyvauto_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     # 驗證：不應該有 "from parser import" 這樣的語句
     assert "from parser import" not in content, (
-        "pyautocomplete.py 仍然依賴 parser.py。"
+        "pyvauto.py 仍然依賴 parser.py。"
         "這個測試預期會失敗 (RED)，直到我們完成合併。"
     )
 
-    # 進一步驗證：所有必要的類別都應該在 pyautocomplete.py 內部定義
+    # 進一步驗證：所有必要的類別都應該在 pyvauto.py 內部定義
     assert "class VerilogPort:" in content, (
-        "VerilogPort 類別應該在 pyautocomplete.py 中定義"
+        "VerilogPort 類別應該在 pyvauto.py 中定義"
     )
     assert "class VerilogModule:" in content, (
-        "VerilogModule 類別應該在 pyautocomplete.py 中定義"
+        "VerilogModule 類別應該在 pyvauto.py 中定義"
     )
     assert "class RegexVerilogParser:" in content, (
-        "RegexVerilogParser 類別應該在 pyautocomplete.py 中定義"
+        "RegexVerilogParser 類別應該在 pyvauto.py 中定義"
     )
 
 
-def test_pyautocomplete_imports_only_stdlib():
+def test_pyvauto_imports_only_stdlib():
     """
-    測試 pyautocomplete.py 只使用標準庫
+    測試 pyvauto.py 只使用標準庫
     """
     project_root = Path(__file__).parent.parent
-    pyautocomplete_path = project_root / "pyautocomplete.py"
+    pyvauto_path = project_root / "pyvauto.py"
 
-    with open(pyautocomplete_path, "r", encoding="utf-8") as f:
+    with open(pyvauto_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     # 標準庫模組列表
@@ -76,5 +76,5 @@ def test_pyautocomplete_imports_only_stdlib():
 
         # 驗證只使用標準庫或內建型別
         assert module in stdlib_modules or module.startswith("__"), (
-            f"發現非標準庫引用: {module}。pyautocomplete.py 應該只使用標準庫。"
+            f"發現非標準庫引用: {module}。pyvauto.py 應該只使用標準庫。"
         )

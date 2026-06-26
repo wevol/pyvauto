@@ -1,4 +1,4 @@
-# Pyautocomplete - Python Verilog Auto-Generator
+# pyvauto - Python Verilog Auto-Generator
 
 Python 版本的 Verilog 自動化工具，提供類似 Emacs `verilog-mode` 的自動擴展功能。本工具旨在現代化的開發環境（如 VS Code）中，提供高效、穩定且不依賴 Emacs 的硬體描述語言開發體驗。
 
@@ -31,7 +31,7 @@ python -m venv .venv
 ### 基本用法
 
 ```bash
-python pyautocomplete.py <file1.sv> <file2.sv> ...
+python pyvauto.py <file1.sv> <file2.sv> ...
 ```
 
 ### 功能展示
@@ -61,7 +61,7 @@ endmodule
 
 ## 專案結構
 
-- `pyautocomplete.py`: 主要入口，整合擴展邏輯與 CLI。
+- `pyvauto.py`: 主要入口，整合擴展邏輯與 CLI。
 - `parser.py`: 核心解析模組，使用 Regex 進行語法分析。
 - `test_*.sv`: 各項功能的驗證測試案例。
 

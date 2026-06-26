@@ -2,13 +2,13 @@
 
 ## 問題解決
 
-如果您的 Vim 只編譯了 Python 2.7 支持，無法直接執行 Python 3 程式碼，本專案提供了**外部命令調用方案**，讓 Vim 調用系統的 Python 3 來執行 `pyautocomplete.py`。
+如果您的 Vim 只編譯了 Python 2.7 支持，無法直接執行 Python 3 程式碼，本專案提供了**外部命令調用方案**，讓 Vim 調用系統的 Python 3 來執行 `pyvauto.py`。
 
 ---
 
 ## Python 版本支援
 
-`pyautocomplete.py` 現在支援：
+`pyvauto.py` 現在支援：
 - ✅ Python 3.6.8+
 - ✅ Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
 
@@ -37,7 +37,7 @@ python3 --version
 
 ```vim
 " 在 .vimrc 中添加
-set runtimepath+=D:/code/PYTHON/autocomplete-vim
+set runtimepath+=D:/code/PYTHON/pyvauto
 ```
 
 或者手動複製插件文件：
@@ -58,8 +58,8 @@ copy plugin\verilog_auto.vim %USERPROFILE%\vimfiles\plugin\
 " 如果 Python 執行檔不是 'python'（例如是 'python3'）
 let g:verilog_auto_python = 'python3'
 
-" 如果 pyautocomplete.py 路徑需要明確指定
-let g:verilog_auto_script = 'D:/code/PYTHON/autocomplete-vim/pyautocomplete.py'
+" 如果 pyvauto.py 路徑需要明確指定
+let g:verilog_auto_script = 'D:/code/PYTHON/pyvauto/pyvauto.py'
 
 " 啟用保存時自動擴展（可選）
 let g:verilog_auto_on_save = 1
@@ -91,7 +91,7 @@ let g:verilog_auto_no_mappings = 1
 2. 按 `\va` 或 `F5`
 3. 插件會：
    - 保存當前檔案
-   - 調用外部 Python 3 執行 `pyautocomplete.py`
+   - 調用外部 Python 3 執行 `pyvauto.py`
    - 自動重新載入檔案
    - 顯示結果訊息
 
@@ -123,11 +123,11 @@ nnoremap <silent> <F9> :VerilogAuto<CR>
 let g:verilog_auto_python = 'C:/Python36/python.exe'
 ```
 
-### 錯誤：找不到 pyautocomplete.py
+### 錯誤：找不到 pyvauto.py
 
 ```vim
 " 使用絕對路徑
-let g:verilog_auto_script = 'D:/code/PYTHON/autocomplete-vim/pyautocomplete.py'
+let g:verilog_auto_script = 'D:/code/PYTHON/pyvauto/pyvauto.py'
 ```
 
 ### 檢查配置
@@ -158,13 +158,13 @@ let g:verilog_auto_script = 'D:/code/PYTHON/autocomplete-vim/pyautocomplete.py'
 執行測試確保一切正常：
 
 ```bash
-cd D:/code/PYTHON/autocomplete-vim
+cd D:/code/PYTHON/pyvauto
 
 # 執行測試
 python -m pytest tests/ -v
 
 # 手動測試
-python pyautocomplete.py tests/test_top.sv
+python pyvauto.py tests/test_top.sv
 ```
 
 所有測試應該通過。
