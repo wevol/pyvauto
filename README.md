@@ -1,6 +1,6 @@
 # pyvauto - Python Verilog Auto-Generator
 
-Python 版本的 Verilog 自動化工具，提供類似 Emacs `verilog-mode` 的自動擴展功能。本工具旨在現代化的開發環境（如 VS Code）中，提供高效、穩定且不依賴 Emacs 的硬體描述語言開發體驗。
+Python 版本的 Verilog 自動化工具，提供類似 Emacs `verilog-mode` 的自動擴展功能。本工具**專為 Vim 設計**（內附 Vim 插件），讓你不必依賴 Emacs，也能在 Vim 中以一個快捷鍵完成 AUTOINST / AUTOARG / AUTOWIRE 等自動擴展。本體是純 Python CLI，因此也能獨立從命令列執行、或接進 CI；其他編輯器（如 VS Code）目前沒有專屬插件，需自行在終端機呼叫 CLI 再重新載入檔案。
 
 ## 功能特點
 
@@ -16,23 +16,44 @@ Python 版本的 Verilog 自動化工具，提供類似 Emacs `verilog-mode` 的
 
 ```bash
 # 克隆或下載本專案
-cd pyvlog
+cd pyvauto
 
-# 建議使用虛擬環境 (Python 3.8+)
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
-
-# 無需額外依賴，核心功能僅需 Python 標準庫
+# 本體零依賴，核心功能僅需 Python 標準庫 (Python 3.6.8+)
+# 若要跑測試，建議使用 uv 建立環境：
+uv sync
 ```
+
+## Vim 整合（主要用途）
+
+本專案內附 Vim 插件 `plugin/verilog_auto.vim`，透過呼叫系統的 Python 3 來執行擴展，因此**即使你的 Vim 只內建 Python 2.7 也能使用**。
+
+```vim
+" 在 .vimrc 中將專案目錄加入 runtimepath
+set runtimepath+=/path/to/pyvauto
+
+" 若系統 Python 3 指令不是 'python3' 可自訂
+let g:verilog_auto_python = 'python3'
+```
+
+在 Verilog/SystemVerilog 檔案 (`.v` / `.sv`) 中：
+
+- 按 **`\va`** 或 **`F5`**，或執行 **`:VerilogAuto`**
+- 插件會自動保存檔案 → 呼叫 `pyvauto.py` 擴展 → 重新載入
+
+完整設定（自訂快捷鍵、保存時自動擴展、路徑指定、故障排除）請見 [VIM_INTEGRATION.md](VIM_INTEGRATION.md)。
 
 ## 使用方式
 
-### 基本用法
+### 命令列基本用法
+
+也可以直接從命令列對檔案做就地擴展（適合 CI，或在沒有專屬插件的編輯器中搭配終端機使用）：
 
 ```bash
 python pyvauto.py <file1.sv> <file2.sv> ...
 ```
+
+> ⚠️ CLI 會索引**當前工作目錄 (`.`)** 來尋找模組定義，而非目標檔案所在目錄。
+> 因此 AUTOINST 等跨模組擴展，請**從含有子模組定義的專案根目錄執行**。
 
 ### 功能展示
 
@@ -61,9 +82,10 @@ endmodule
 
 ## 專案結構
 
-- `pyvauto.py`: 主要入口，整合擴展邏輯與 CLI。
-- `parser.py`: 核心解析模組，使用 Regex 進行語法分析。
-- `test_*.sv`: 各項功能的驗證測試案例。
+- `pyvauto.py`: 單檔本體，整合 Regex 解析器、擴展邏輯與 CLI（零外部依賴）。
+- `plugin/verilog_auto.vim`: Vim 插件，呼叫 `pyvauto.py` 完成擴展。
+- `VIM_INTEGRATION.md`: Vim 整合與設定的完整說明。
+- `tests/`: pytest 單元測試與 `*.sv` 驗證案例。
 
 ## 開發狀態
 
