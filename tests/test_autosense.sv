@@ -1,0 +1,30 @@
+module test_autosense (
+    input clk,
+    input rst_n,
+    input a,
+    input b,
+    input c,
+    input en,
+    output reg [3:0] y,
+    output reg z
+);
+
+    // Combinational block with AUTOSENSE (lowercase test)
+    always @(/*AUTOSENSE*/a or b or c or ena or b or c or ena or b or c or en) begin
+        if (en) begin
+            y = a ? 4'd1 : 4'd2;
+            z = a | b | c;
+        end else begin
+            y = 4'd0;
+            z = 1'b0;
+        end
+    end
+
+    // Sequential block should NOT have AUTOSENSE (manual test)
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            // ...
+        end
+    end
+
+endmodule

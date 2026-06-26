@@ -1,0 +1,21 @@
+module sub (
+    input clk,
+    input rst,
+    input [7:0] data
+);
+endmodule
+
+module top;
+    wire clk, rst;
+    wire [7:0] data;
+
+    sub u_sub  (
+        // .clk(clk),
+        .rst(rst)
+        /*AUTOINST*/
+, // Inputs
+    .clk (clk),
+    .data (data[7:0])
+    
+    );
+endmodule

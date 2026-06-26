@@ -1,0 +1,28 @@
+module top_autologic (
+    input clk,
+    input rst_n,
+    input [7:0] data_in,
+    output [7:0] data_out
+);
+
+    /*AUTOLOGIC*/
+    // Beginning of automatic logic 
+    logic [WIDTH-1:0] data_o_logic;
+    // End of automatics
+
+    sub_module u_sub0  (
+        .clk   (clk),
+        .rst_n (rst_n),
+        .data_i(data_in),
+        .data_o(data_o_logic)
+    );
+
+endmodule
+
+module sub_module (
+    input clk,
+    input rst_n,
+    input [7:0] data_i,
+    output [7:0] data_o
+);
+endmodule
