@@ -104,3 +104,7 @@ MIT
 ## Contributing
 
 Issues and pull requests are welcome!
+
+## Acknowledgements
+
+This project was built entirely with [Claude Code](https://claude.com/claude-code).

@@ -106,3 +106,7 @@ MIT
 ## 貢獻
 
 歡迎提交 Issue 和 Pull Request！
+
+## 致謝
+
+本專案全部使用 [Claude Code](https://claude.com/claude-code) 製作。
