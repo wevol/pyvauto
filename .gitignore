@@ -15,3 +15,6 @@ verible-*/
 
 # macOS
 .DS_Store
+
+# Claude Code local guidance (not published)
+CLAUDE.md
