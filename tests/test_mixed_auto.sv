@@ -1,10 +1,14 @@
+// Mixed-mode (non-ANSI): manual declarations coexist with AUTO* tags.
+// Port list carries names only (AUTOARG); directions live in the body.
 module mixed_top (
-    /*autoarg*/
-    input clk,
+    /*AUTOARG*/
 );
 
-    /*AUTOOUTPUT*/
+    input clk;
     output manual_out;
+
+    /*AUTOINPUT*/
+    /*AUTOOUTPUT*/
 
     sub_module u_sub0 (
         .clk(clk),

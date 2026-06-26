@@ -960,13 +960,15 @@ class VerilogExpander:
             sorted_sigs = sorted(list(detected_sigs))
             sig_list = " or ".join(sorted_sigs)
 
-            # Replace tag with tag + signal list (case-insensitive replacement)
-            # We normalize to uppercase tag in the output
+            # Replace the tag *and any previously-generated list that follows
+            # it* with the freshly detected signals. Discarding the old trailing
+            # content keeps AUTOSENSE idempotent — re-running must replace the
+            # list, not accumulate duplicates after the tag.
             new_paren = re.sub(
-                r"/\*AUTOSENSE\*/",
-                f"/*AUTOSENSE*/{sig_list}",
+                r"/\*AUTOSENSE\*/.*",
+                lambda _m: f"/*AUTOSENSE*/{sig_list}",
                 paren_content,
-                flags=re.IGNORECASE,
+                flags=re.IGNORECASE | re.DOTALL,
             )
 
             print(f"  AUTOSENSE: Found signals {sorted_sigs}")

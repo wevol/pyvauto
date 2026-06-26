@@ -439,6 +439,139 @@ class TestBugFixes:
         result = expander.expand_autooutput(top, "top.sv")
         assert "output [15:0] dout;" in result
 
+    def test_autooutput_non_ansi_body_idempotent(self):
+        """AUTOOUTPUT body 路徑展開兩次不應產生重複宣告"""
+        project = VerilogProject()
+        sub = """
+        module sub (output [15:0] dout);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+
+        expander = VerilogExpander(project)
+        top = """
+        module top;
+            /*AUTOOUTPUT*/
+            sub u (.dout(dout));
+        endmodule
+        """
+        once = expander.expand_autooutput(top, "top.sv")
+        twice = expander.expand_autooutput(once, "top.sv")
+        assert once == twice
+
+    def test_autowire_idempotent(self):
+        """AUTOWIRE 展開兩次應產生相同結果（替換既有自動區塊，不重複附加）"""
+        project = VerilogProject()
+        sub = """
+        module producer (output [3:0] data);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+
+        expander = VerilogExpander(project)
+        top = """
+        module top;
+            /*AUTOWIRE*/
+            producer u (.data(bus));
+        endmodule
+        """
+        once = expander.expand_autowire(top, "top.sv")
+        twice = expander.expand_autowire(once, "top.sv")
+        assert once == twice
+        # 自動區塊標記只應出現一次
+        assert once.count("// Beginning of automatic") == 1
+
+    def test_autowire_skips_manually_declared_wire(self):
+        """AUTOWIRE 混合模式: 已手動宣告的 wire 不應被重複宣告"""
+        project = VerilogProject()
+        sub = """
+        module producer (output [3:0] a_out, output [7:0] b_out);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+
+        expander = VerilogExpander(project)
+        top = """
+        module top;
+            wire [3:0] manual_sig;
+            /*AUTOWIRE*/
+            producer u (.a_out(manual_sig), .b_out(auto_sig));
+        endmodule
+        """
+        result = expander.expand_autowire(top, "top.sv")
+        # 未宣告的 auto_sig 由 AUTOWIRE 補上
+        assert "wire [7:0] auto_sig;" in result
+        # 已手動宣告的 manual_sig 不應被再宣告一次
+        assert result.count("wire [3:0] manual_sig") == 1
+
+    def test_autologic_idempotent(self):
+        """AUTOLOGIC 展開兩次應產生相同結果"""
+        project = VerilogProject()
+        sub = """
+        module sub_mod (output [15:0] out_sig);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+
+        expander = VerilogExpander(project)
+        top = """
+        module top;
+            /*AUTOLOGIC*/
+            sub_mod u_sub (.out_sig(my_logic_sig));
+        endmodule
+        """
+        once = expander.expand_autologic(top, "top.sv")
+        twice = expander.expand_autologic(once, "top.sv")
+        assert once == twice
+        assert once.count("// Beginning of automatic") == 1
+
+    def test_autologic_skips_manually_declared_logic(self):
+        """AUTOLOGIC 混合模式: 已手動宣告的 logic 不應被重複宣告"""
+        project = VerilogProject()
+        sub = """
+        module sub_mod (output [15:0] a_sig, output [7:0] b_sig);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+
+        expander = VerilogExpander(project)
+        top = """
+        module top;
+            logic [15:0] manual_logic;
+            /*AUTOLOGIC*/
+            sub_mod u (.a_sig(manual_logic), .b_sig(auto_logic));
+        endmodule
+        """
+        result = expander.expand_autologic(top, "top.sv")
+        assert "logic [7:0] auto_logic;" in result
+        assert result.count("logic [15:0] manual_logic") == 1
+
+    def test_autosense_basic_combinational(self):
+        """AUTOSENSE happy-path: 組合邏輯讀取的訊號應全部進入敏感列表，被寫入的不進"""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m;
+            reg a;
+            reg b;
+            reg out;
+            always @(/*AUTOSENSE*/) begin
+                out = a & b;
+            end
+        endmodule
+        """
+        result = expander.expand_autosense(content, "m.sv")
+        sens_line = [l for l in result.splitlines() if "AUTOSENSE" in l][0]
+        # 讀取的 a、b 應進敏感列表
+        assert "a" in sens_line and "b" in sens_line
+        # 被寫入的 out 是 LHS，不應出現於敏感列表
+        assert "out" not in sens_line
+
     def test_autoarg_non_ansi_with_manual_ports(self):
         """Non-ANSI AUTOARG: 手動列出的埠名不應重複出現在自動展開區塊"""
         project = VerilogProject()
