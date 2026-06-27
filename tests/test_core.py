@@ -836,3 +836,161 @@ class TestIntegration:
         assert ".a" in result and "a" in result
         assert ".b" in result and "b" in result
         assert ".sum" in result and "sum" in result
+
+
+class TestDeleteAuto:
+    """反展開 delete_all：清除自動產生內容、只留裸 tag（對應 emacs verilog-delete-auto）。
+    主要用 round-trip 風格：裸 tag -> expand_all -> delete_all 應回到原始裸 tag。"""
+
+    def _expander_with_sub(self):
+        project = VerilogProject()
+        sub = "module sub (input clk, input [7:0] data_i, output [7:0] data_o);\nendmodule\n"
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        return VerilogExpander(project)
+
+    def test_delete_autowire_round_trip(self):
+        expander = self._expander_with_sub()
+        bare = """module top;
+    /*AUTOWIRE*/
+    sub u (.clk(clk), .data_i(data_i), .data_o(data_o));
+endmodule
+"""
+        expanded = expander.expand_all(bare, "top.sv")
+        assert "wire [7:0] data_o;" in expanded  # sanity：展開確實有產生
+        deleted = expander.delete_all(expanded, "top.sv")
+        assert deleted == bare  # 反展開回到原始裸 tag
+
+    def test_delete_autoinst_round_trip(self):
+        expander = self._expander_with_sub()
+        bare = """module top;
+    sub u (
+        /*AUTOINST*/
+    );
+endmodule
+"""
+        expanded = expander.expand_all(bare, "top.sv")
+        assert ".data_o" in expanded  # sanity
+        deleted = expander.delete_all(expanded, "top.sv")
+        assert "/*AUTOINST*/" in deleted
+        assert ".data_o" not in deleted and ".clk" not in deleted
+        # 反展開後再展開應回到展開狀態（證明帶回可重新展開的等價狀態）
+        assert expander.expand_all(deleted, "top.sv") == expanded
+
+    def test_delete_autoarg_round_trip(self):
+        expander = self._expander_with_sub()
+        bare = """module top (/*AUTOARG*/);
+    input clk;
+    input rst_n;
+endmodule
+"""
+        expanded = expander.expand_all(bare, "top.sv")
+        assert "clk, rst_n" in expanded  # sanity
+        deleted = expander.delete_all(expanded, "top.sv")
+        assert "/*AUTOARG*/" in deleted
+        assert "clk, rst_n" not in deleted
+        assert expander.expand_all(deleted, "top.sv") == expanded
+
+    def test_delete_autosense_round_trip(self):
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        bare = """module m;
+    reg a;
+    reg b;
+    reg q;
+    always @(/*AUTOSENSE*/) begin
+        q = a & b;
+    end
+endmodule
+"""
+        expanded = expander.expand_all(bare, "m.sv")
+        assert "a or b" in expanded  # sanity
+        deleted = expander.delete_all(expanded, "m.sv")
+        assert "/*AUTOSENSE*/" in deleted
+        assert "a or b" not in deleted
+        assert deleted == bare  # AUTOSENSE 應 byte-perfect 還原
+
+    def test_delete_autoinput_body_round_trip(self):
+        expander = self._expander_with_sub()
+        bare = """module top;
+    /*AUTOINPUT*/
+    sub u (.clk(clk), .data_i(data_i), .data_o(data_o));
+endmodule
+"""
+        expanded = expander.expand_all(bare, "top.sv")
+        assert "input [7:0] data_i;" in expanded  # sanity（body 形式）
+        deleted = expander.delete_all(expanded, "top.sv")
+        assert "/*AUTOINPUT*/" in deleted
+        assert "input [7:0] data_i;" not in deleted
+        assert deleted == bare
+
+    def test_delete_autooutput_body_round_trip(self):
+        expander = self._expander_with_sub()
+        bare = """module top;
+    /*AUTOOUTPUT*/
+    sub u (.clk(clk), .data_i(data_i), .data_o(data_o));
+endmodule
+"""
+        expanded = expander.expand_all(bare, "top.sv")
+        assert "output [7:0] data_o;" in expanded  # sanity（body 形式）
+        deleted = expander.delete_all(expanded, "top.sv")
+        assert "/*AUTOOUTPUT*/" in deleted
+        assert "output [7:0] data_o;" not in deleted
+        assert deleted == bare
+
+    def test_ansi_autoinput_output_not_reversible(self):
+        """已知限制：ANSI port-list 形式的 AUTOINPUT/AUTOOUTPUT 展開時 tag 即被
+        port 宣告取代（tag 消失），故不可逆。只有 body 形式可反展開。"""
+        expander = self._expander_with_sub()
+        bare = """module top (/*AUTOOUTPUT*/);
+    sub u (.clk(clk), .data_i(data_i), .data_o(data_o));
+endmodule
+"""
+        expanded = expander.expand_all(bare, "top.sv")
+        assert "/*AUTOOUTPUT*/" not in expanded  # 展開即丟 tag（destructive）
+        # 無 tag 可定位 → delete_all 維持原樣，不會誤刪這些 port 宣告
+        assert expander.delete_all(expanded, "top.sv") == expanded
+
+    def test_delete_all_round_trip_multiple_tags(self):
+        expander = self._expander_with_sub()
+        bare = """module top (/*AUTOARG*/);
+    input clk;
+    input rst_n;
+
+    /*AUTOWIRE*/
+
+    sub u_sub (
+        /*AUTOINST*/
+    );
+endmodule
+"""
+        expanded = expander.expand_all(bare, "top.sv")
+        deleted = expander.delete_all(expanded, "top.sv")
+        for tag in ("/*AUTOARG*/", "/*AUTOWIRE*/", "/*AUTOINST*/"):
+            assert tag in deleted
+        assert "Beginning of automatic" not in deleted
+        assert ".data_o" not in deleted and "clk, rst_n" not in deleted
+        assert expander.expand_all(deleted, "top.sv") == expanded  # 再展開回原狀
+
+    def test_delete_all_is_idempotent(self):
+        expander = self._expander_with_sub()
+        bare = """module top (/*AUTOARG*/);
+    input clk;
+    /*AUTOWIRE*/
+    sub u_sub (
+        /*AUTOINST*/
+    );
+endmodule
+"""
+        expanded = expander.expand_all(bare, "top.sv")
+        once = expander.delete_all(expanded, "top.sv")
+        assert expander.delete_all(once, "top.sv") == once  # 反展開冪等
+
+    def test_delete_ignores_commented_tag(self):
+        expander = self._expander_with_sub()
+        content = """module top;
+    // /*AUTOWIRE*/
+    // sub u ( /*AUTOINST*/ );
+endmodule
+"""
+        assert expander.delete_all(content, "top.sv") == content

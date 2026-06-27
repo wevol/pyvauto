@@ -47,6 +47,22 @@ def test_cli_missing_file_is_skipped(tmp_path):
     assert "Skip" in r.stdout and "not found" in r.stdout
 
 
+def test_cli_delete_reverses_expansion(tmp_path):
+    (tmp_path / "sub.sv").write_text(SUB)
+    top = tmp_path / "top.sv"
+    top.write_text(TOP)
+
+    _run(["top.sv"], tmp_path)  # 先展開
+    assert ".clk" in top.read_text()
+
+    r = _run(["--delete", "top.sv"], tmp_path)  # 反展開
+
+    assert r.returncode == 0, r.stderr
+    out = top.read_text()
+    assert "/*AUTOINST*/" in out
+    assert ".clk" not in out and ".data_o" not in out
+
+
 def test_cli_second_run_is_idempotent(tmp_path):
     (tmp_path / "sub.sv").write_text(SUB)
     top = tmp_path / "top.sv"

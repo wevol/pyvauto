@@ -72,3 +72,46 @@ def test_plugin_end_to_end_expansion(tmp_path):
 
     out = top.read_text()
     assert ".clk" in out and ".data_i" in out and ".data_o" in out
+
+
+def test_plugin_delete_command_and_mappings(tmp_path):
+    """:NVA 命令存在，\\nva 與 <F6> 都綁定到 :NVA。"""
+    result = tmp_path / "result.txt"
+    script = tmp_path / "check.vim"
+    script.write_text(
+        f"source {PLUGIN}\n"
+        f"redir! > {result}\n"
+        "echo 'has_NVA=' . exists(':NVA')\n"
+        "echo 'map_nva=' . maparg('\\nva', 'n')\n"
+        "echo 'map_F6=' . maparg('<F6>', 'n')\n"
+        "redir END\n"
+        "qa!\n"
+    )
+    _run_vim(script)
+
+    text = result.read_text()
+    assert "has_NVA=2" in text          # command defined
+    assert "map_nva=:NVA" in text       # \nva maps to :NVA
+    assert "map_F6=:NVA" in text        # <F6> maps to :NVA
+
+
+def test_plugin_end_to_end_delete(tmp_path):
+    """在 vim 內 :Pyvauto 展開後 → :NVA 反展開 → 自動連線消失、tag 還在。"""
+    (tmp_path / "sub.sv").write_text(SUB)
+    top = tmp_path / "top.sv"
+    top.write_text(TOP)
+
+    script = tmp_path / "run.vim"
+    script.write_text(
+        f"source {PLUGIN}\n"
+        f"cd {tmp_path}\n"
+        "edit top.sv\n"
+        "Pyvauto\n"
+        "NVA\n"
+        "qa!\n"
+    )
+    _run_vim(script)
+
+    out = top.read_text()
+    assert "/*AUTOINST*/" in out
+    assert ".clk" not in out and ".data_o" not in out

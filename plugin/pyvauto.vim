@@ -20,47 +20,59 @@ if !exists('g:pyvauto_script')
     let g:pyvauto_script = expand('<sfile>:p:h:h') . '/pyvauto.py'
 endif
 
-" Main expansion function
-function! PyvautoExpand()
+" Shared runner: a:delete=0 expands, a:delete=1 un-expands (passes --delete).
+function! s:Run(delete) abort
     " Remember the cursor position
     let l:save_cursor = getpos('.')
 
     " Save the file
     write
 
-    " Absolute path of the current file
-    let l:file = expand('%:p')
-
-    " Build the command
+    " Build the command (add --delete for the un-expand path)
+    let l:flag = a:delete ? ' --delete' : ''
     let l:cmd = shellescape(g:pyvauto_python) . ' ' .
-              \ shellescape(g:pyvauto_script) . ' ' .
-              \ shellescape(l:file)
+              \ shellescape(g:pyvauto_script) . l:flag . ' ' .
+              \ shellescape(expand('%:p'))
 
     " Run it and capture the output
-    echo "Expanding Verilog auto tags..."
+    echo a:delete ? "Deleting Verilog auto tags..." : "Expanding Verilog auto tags..."
     let l:output = system(l:cmd)
 
     if v:shell_error == 0
         " Reload the file and restore the cursor
         edit!
         call setpos('.', l:save_cursor)
-        echo "Verilog auto expansion completed successfully!"
+        echo a:delete ? "Verilog auto deletion completed successfully!"
+                    \ : "Verilog auto expansion completed successfully!"
     else
         echohl ErrorMsg
-        echo "Error expanding Verilog auto tags:"
+        echo a:delete ? "Error deleting Verilog auto tags:"
+                    \ : "Error expanding Verilog auto tags:"
         echo l:output
         echohl None
     endif
 endfunction
 
-" Command to expand the current file (:VA kept as a short alias)
+function! PyvautoExpand()
+    call s:Run(0)
+endfunction
+
+function! PyvautoDelete()
+    call s:Run(1)
+endfunction
+
+" Commands: :Pyvauto / :VA expand, :NVA un-expands (delete)
 command! Pyvauto call PyvautoExpand()
 command! VA call PyvautoExpand()
+command! NVA call PyvautoDelete()
 
-" Default mappings: \va and F5 (disable with: let g:pyvauto_no_mappings = 1)
+" Default mappings (disable with: let g:pyvauto_no_mappings = 1):
+"   \va / F5 expand,  \nva / F6 un-expand
 if !exists('g:pyvauto_no_mappings') || !g:pyvauto_no_mappings
     nnoremap <silent> <Leader>va :Pyvauto<CR>
     nnoremap <silent> <F5> :Pyvauto<CR>
+    nnoremap <silent> <Leader>nva :NVA<CR>
+    nnoremap <silent> <F6> :NVA<CR>
 endif
 
 " Optional: expand automatically when saving .v / .sv files (off by default)
@@ -77,7 +89,7 @@ endif
 "   let g:pyvauto_python = 'python3'              " Python 3 executable
 "   let g:pyvauto_script = '/path/to/pyvauto.py'  " explicit script path
 "   let g:pyvauto_on_save = 1                      " expand on save
-"   let g:pyvauto_no_mappings = 1                  " disable \va and F5
+"   let g:pyvauto_no_mappings = 1                  " disable \va/F5 + \nva/F6
 "
-" Usage: press \va or F5 in a Verilog file, or run :Pyvauto
+" Usage: \va or F5 (or :Pyvauto) expands; \nva or F6 (or :NVA) un-expands.
 " ============================================================================
