@@ -104,6 +104,46 @@ _INST_SKIP_KEYWORDS = {
     "task",
 }
 
+# Verilog keywords AUTOSENSE must never treat as a sensitivity-list signal.
+_AUTOSENSE_KEYWORDS = {
+    "always",
+    "begin",
+    "end",
+    "if",
+    "else",
+    "case",
+    "endcase",
+    "assign",
+    "default",
+    "posedge",
+    "negedge",
+    "or",
+    "and",
+    "logic",
+    "reg",
+    "wire",
+    "initial",
+    "input",
+    "output",
+    "inout",
+    "module",
+    "endmodule",
+    "task",
+    "endtask",
+    "function",
+    "endfunction",
+    "fork",
+    "join",
+    "generate",
+    "endgenerate",
+    "repeat",
+    "while",
+    "for",
+    "forever",
+    "integer",
+    "bit",
+}
+
 
 def _widths_mismatch(w1: str, w2: str) -> bool:
     """True if two width strings represent different widths (ignoring whitespace)."""
@@ -374,97 +414,18 @@ class VerilogExpander:
             manual_conns = parse_named_port_connections(clean_block)
 
             existing_ports = set(manual_conns.keys())
-
-            # Validation of manual connections
-            for p_name, sig_val in manual_conns.items():
-                p_def = next((p for p in module.ports if p.name == p_name), None)
-                if not p_def:
-                    print(
-                        f"Warning: Port '{p_name}' does not exist in module '{mod_name}'."
-                    )
-                    continue
-
-                sig_width_match = re.search(r"(\[.*?\])$", sig_val)
-                sig_width = sig_width_match.group(1) if sig_width_match else ""
-
-                if _widths_mismatch(p_def.width, sig_width):
-                    print(
-                        f"Warning: Width mismatch for port '{p_name}' in instance '{inst_name}'. Module has '{p_def.width}', connection has '{sig_width}'."
-                    )
+            self._warn_manual_connection_widths(
+                module, manual_conns, mod_name, inst_name
+            )
 
             ports_to_expand = [p for p in module.ports if p.name not in existing_ports]
 
             if not ports_to_expand:
                 return match.group(0)
-            else:
-                # Group ports by direction
-                outputs = [p for p in ports_to_expand if p.direction == "output"]
-                inouts = [p for p in ports_to_expand if p.direction == "inout"]
-                inputs = [p for p in ports_to_expand if p.direction == "input"]
-                others = [
-                    p
-                    for p in ports_to_expand
-                    if p.direction not in ["output", "input", "inout"]
-                ]
 
-                lines = []
-                # Track warning-comment suffixes keyed by line index so that any
-                # later comma-insertion step puts the comma BEFORE the comment.
-                line_warnings: Dict[int, str] = {}
-
-                def format_p(p):
-                    padding = " "
-                    width_str = p.width if p.width else ""
-                    line = f"    .{p.name}{padding}({p.name}{width_str})"
-                    local_w = local_widths.get(p.name, "")
-                    if _widths_mismatch(p.width, local_w):
-                        line_warnings[len(lines)] = (
-                            f"  // WARNING: width mismatch — "
-                            f"{mod_name}.{p.name} is {p.width}, local {p.name} is {local_w}"
-                        )
-                    return line
-
-                if outputs:
-                    lines.append("    // Outputs")
-                    for p in outputs:
-                        lines.append(format_p(p))
-
-                if inouts:
-                    lines.append("    // Inouts")
-                    for p in inouts:
-                        lines.append(format_p(p))
-
-                if inputs:
-                    lines.append("    // Inputs")
-                    for p in inputs:
-                        lines.append(format_p(p))
-
-                for p in others:
-                    lines.append(format_p(p))
-
-                # Add commas to port lines
-                port_indices = [
-                    i for i, line in enumerate(lines) if line.strip().startswith(".")
-                ]
-
-                if port_indices:
-                    # Add comma to all except last port
-                    for i in port_indices[:-1]:
-                        lines[i] += ","
-
-                    # Logic for trailing comma: if there is content after the tag, add comma
-                    tag_index = port_block.find(autoinst_tag)
-                    after_tag = port_block[tag_index + len(autoinst_tag) :].strip()
-
-                    if after_tag and not after_tag.startswith(","):
-                        lines[port_indices[-1]] += ","
-
-                # Append warning comments AFTER comma-insertion so the comma
-                # stays part of the port list and is not swallowed by the comment.
-                for i, warning in line_warnings.items():
-                    lines[i] = lines[i] + warning
-
-                port_str = "\n".join(lines)
+            port_str = self._build_autoinst_port_lines(
+                ports_to_expand, mod_name, local_widths, port_block, autoinst_tag
+            )
 
             # Construct replacement: just the tag + new content, no block markers
             # Handle leading comma if needed
@@ -489,15 +450,108 @@ class VerilogExpander:
             print(f"Expanded instance {inst_name} of {mod_name}")
             return result
 
-        # Run the match scan on masked content so instantiations inside
-        # comments don't get expanded, while using the ORIGINAL content
-        # for group extraction via byte offsets (_mask_comments preserves
-        # layout, so offsets line up).
+        return self._apply_masked_replacements(content, pattern, replace_fn)
+
+    def _warn_manual_connection_widths(self, module, manual_conns, mod_name, inst_name):
+        """Print warnings for hand-written port connections: unknown ports and
+        bus-width mismatches against the module definition."""
+        for p_name, sig_val in manual_conns.items():
+            p_def = next((p for p in module.ports if p.name == p_name), None)
+            if not p_def:
+                print(
+                    f"Warning: Port '{p_name}' does not exist in module '{mod_name}'."
+                )
+                continue
+
+            sig_width_match = re.search(r"(\[.*?\])$", sig_val)
+            sig_width = sig_width_match.group(1) if sig_width_match else ""
+
+            if _widths_mismatch(p_def.width, sig_width):
+                print(
+                    f"Warning: Width mismatch for port '{p_name}' in instance '{inst_name}'. Module has '{p_def.width}', connection has '{sig_width}'."
+                )
+
+    def _build_autoinst_port_lines(
+        self, ports_to_expand, mod_name, local_widths, port_block, autoinst_tag
+    ):
+        """Render the auto-generated /*AUTOINST*/ port connections: group by
+        direction, add commas, and append width-mismatch warning comments."""
+        outputs = [p for p in ports_to_expand if p.direction == "output"]
+        inouts = [p for p in ports_to_expand if p.direction == "inout"]
+        inputs = [p for p in ports_to_expand if p.direction == "input"]
+        others = [
+            p
+            for p in ports_to_expand
+            if p.direction not in ["output", "input", "inout"]
+        ]
+
+        lines = []
+        # Track warning-comment suffixes keyed by line index so that any
+        # later comma-insertion step puts the comma BEFORE the comment.
+        line_warnings: Dict[int, str] = {}
+
+        def format_p(p):
+            padding = " "
+            width_str = p.width if p.width else ""
+            line = f"    .{p.name}{padding}({p.name}{width_str})"
+            local_w = local_widths.get(p.name, "")
+            if _widths_mismatch(p.width, local_w):
+                line_warnings[len(lines)] = (
+                    f"  // WARNING: width mismatch — "
+                    f"{mod_name}.{p.name} is {p.width}, local {p.name} is {local_w}"
+                )
+            return line
+
+        if outputs:
+            lines.append("    // Outputs")
+            for p in outputs:
+                lines.append(format_p(p))
+
+        if inouts:
+            lines.append("    // Inouts")
+            for p in inouts:
+                lines.append(format_p(p))
+
+        if inputs:
+            lines.append("    // Inputs")
+            for p in inputs:
+                lines.append(format_p(p))
+
+        for p in others:
+            lines.append(format_p(p))
+
+        # Add commas to port lines
+        port_indices = [
+            i for i, line in enumerate(lines) if line.strip().startswith(".")
+        ]
+
+        if port_indices:
+            # Add comma to all except last port
+            for i in port_indices[:-1]:
+                lines[i] += ","
+
+            # Logic for trailing comma: if there is content after the tag, add comma
+            tag_index = port_block.find(autoinst_tag)
+            after_tag = port_block[tag_index + len(autoinst_tag) :].strip()
+
+            if after_tag and not after_tag.startswith(","):
+                lines[port_indices[-1]] += ","
+
+        # Append warning comments AFTER comma-insertion so the comma
+        # stays part of the port list and is not swallowed by the comment.
+        for i, warning in line_warnings.items():
+            lines[i] = lines[i] + warning
+
+        return "\n".join(lines)
+
+    def _apply_masked_replacements(self, content, pattern, replace_fn):
+        """Scan masked content so instantiations inside comments don't get
+        expanded, while re-matching the ORIGINAL content at the same byte
+        offsets to recover real group text (_mask_comments preserves layout,
+        so offsets line up). Splice the replacements back into the content."""
         masked = self._mask_comments(content)
         replacements = []
         for match in pattern.finditer(masked):
-            # Re-match against original content at the same offsets to recover
-            # real group text (comments inside values would be blanks otherwise).
             real_match = pattern.match(content, match.start())
             if real_match is None:
                 continue
@@ -552,23 +606,8 @@ class VerilogExpander:
         # Scan entire port_block for existing ports
         is_ansi = bool(re.search(r"\b(input|output|inout)\b", port_block))
 
-        # Identify existing ports in the header port list
-        existing_ports = set()
-        # For ANSI, we need to extract names from 'direction [width] name'
-        # For Non-ANSI, it's just 'name'
-        if is_ansi:
-            for p_match in self.project.parser.port_re.finditer(
-                self._strip_comments(port_block)
-            ):
-                existing_ports.add(p_match.group(4))
-        else:
-            # Remove the tag before splitting
-            clean_block = port_block.replace(autoarg_tag, "")
-            clean_block = self._strip_comments(clean_block)
-            for p in re.split(r",", clean_block):
-                p_name = p.strip()
-                if p_name:
-                    existing_ports.add(p_name)
+        # Identify existing header ports, then expand the rest.
+        existing_ports = self._collect_header_ports(port_block, autoarg_tag, is_ansi)
 
         # Validation of manual ports in header
         for p_name in existing_ports:
@@ -577,44 +616,8 @@ class VerilogExpander:
                     f"Warning: Port '{p_name}' listed in AUTOARG header does not exist in module '{target_mod_name}'."
                 )
 
-        # Filter ports to expand
         ports_to_expand = [p for p in module.ports if p.name not in existing_ports]
-
-        # Formatting
-        indent = "    "
-        limit = 80
-
-        def wrap_lines(items, indent_str, limit=80):
-            lines = []
-            curr_line = indent_str
-            for i, item in enumerate(items):
-                suffix = "," if i < len(items) - 1 else ""
-                to_add = item + suffix
-                # +1 for space after comma
-                if i > 0 and len(curr_line) + len(to_add) + 1 > limit:
-                    lines.append(curr_line.rstrip())
-                    curr_line = indent_str + to_add
-                else:
-                    if i > 0:
-                        curr_line += " "
-                    curr_line += to_add
-            if curr_line.strip():
-                lines.append(curr_line.rstrip())
-            return "\n".join(lines)
-
-        if not ports_to_expand:
-            arg_list = ""
-        elif is_ansi:
-            # ANSI Mode: Generate full declarations, each on a new line
-            decls = []
-            for p in ports_to_expand:
-                width = f"{p.width} " if p.width else ""
-                decls.append(f"{p.direction} {width}{p.name}")
-            arg_list = ",\n    ".join(decls)
-        else:
-            # Non-ANSI Mode: Names only, wrapped to 80 chars
-            names = [p.name for p in ports_to_expand]
-            arg_list = wrap_lines(names, indent, limit)
+        arg_list = self._format_autoarg_list(ports_to_expand, is_ansi)
 
         tag_index = port_block.find(autoarg_tag)
         before_tag = port_block[:tag_index].strip()
@@ -638,6 +641,63 @@ class VerilogExpander:
             header += " " + params.strip()
         replacement = f"{header} ({new_port_block.rstrip()}\n);"
         return content[: match.start()] + replacement + content[match.end() :]
+
+    def _collect_header_ports(self, port_block, autoarg_tag, is_ansi):
+        """Collect names of ports already listed in an AUTOARG module header.
+        ANSI headers carry 'direction [width] name' declarations; Non-ANSI
+        headers are a bare comma-separated name list."""
+        existing_ports = set()
+        if is_ansi:
+            for p_match in self.project.parser.port_re.finditer(
+                self._strip_comments(port_block)
+            ):
+                existing_ports.add(p_match.group(4))
+        else:
+            # Remove the tag before splitting
+            clean_block = port_block.replace(autoarg_tag, "")
+            clean_block = self._strip_comments(clean_block)
+            for p in re.split(r",", clean_block):
+                p_name = p.strip()
+                if p_name:
+                    existing_ports.add(p_name)
+        return existing_ports
+
+    def _format_autoarg_list(self, ports_to_expand, is_ansi):
+        """Render the AUTOARG port list. ANSI mode emits one full declaration
+        ('direction [width] name') per line; Non-ANSI mode emits bare names
+        wrapped to 80 columns."""
+        if not ports_to_expand:
+            return ""
+        if is_ansi:
+            # ANSI Mode: Generate full declarations, each on a new line
+            decls = []
+            for p in ports_to_expand:
+                width = f"{p.width} " if p.width else ""
+                decls.append(f"{p.direction} {width}{p.name}")
+            return ",\n    ".join(decls)
+
+        # Non-ANSI Mode: Names only, wrapped to 80 chars
+        names = [p.name for p in ports_to_expand]
+        return self._wrap_names(names, "    ", 80)
+
+    @staticmethod
+    def _wrap_names(items, indent_str, limit=80):
+        lines = []
+        curr_line = indent_str
+        for i, item in enumerate(items):
+            suffix = "," if i < len(items) - 1 else ""
+            to_add = item + suffix
+            # +1 for space after comma
+            if i > 0 and len(curr_line) + len(to_add) + 1 > limit:
+                lines.append(curr_line.rstrip())
+                curr_line = indent_str + to_add
+            else:
+                if i > 0:
+                    curr_line += " "
+                curr_line += to_add
+        if curr_line.strip():
+            lines.append(curr_line.rstrip())
+        return "\n".join(lines)
 
     def _expand_auto_signals(
         self, content: str, file_path: str, tag_name: str, signal_type: str
@@ -841,83 +901,13 @@ class VerilogExpander:
         # Get local signals for filtering
         local_signals = self.project.parser.get_local_signals(content, file_path)
 
-        # Verilog keywords to ignore
-        keywords = {
-            "always",
-            "begin",
-            "end",
-            "if",
-            "else",
-            "case",
-            "endcase",
-            "assign",
-            "default",
-            "posedge",
-            "negedge",
-            "or",
-            "and",
-            "logic",
-            "reg",
-            "wire",
-            "initial",
-            "input",
-            "output",
-            "inout",
-            "module",
-            "endmodule",
-            "task",
-            "endtask",
-            "function",
-            "endfunction",
-            "fork",
-            "join",
-            "generate",
-            "endgenerate",
-            "repeat",
-            "while",
-            "for",
-            "forever",
-            "integer",
-            "bit",
-        }
-
-        def get_block_body(full_content, start_pos):
-            """Extracts the body of the always block starting after 'always @(...)'"""
-            body_candidate = full_content[start_pos:].strip()
-            if body_candidate.startswith("begin"):
-                # Find matching 'end'
-                # Simple counter-based approach (ignoring strings/comments for now,
-                # though _strip_comments could be used)
-                clean_candidate = self._strip_comments(body_candidate)
-                # But we need positions in original text.
-                # Let's just find keywords in the original text.
-                stack = 0
-                # Use regex to find block boundaries
-                for m in re.finditer(
-                    r"\b(begin|end|case|endcase|fork|join)\b", body_candidate
-                ):
-                    kw = m.group(1)
-                    if kw in ("begin", "case", "fork"):
-                        stack += 1
-                    elif kw in ("end", "endcase", "join"):
-                        stack -= 1
-
-                    if stack == 0:
-                        return body_candidate[: m.end()]
-            else:
-                # Single statement, find first ';'
-                idx = body_candidate.find(";")
-                if idx != -1:
-                    return body_candidate[: idx + 1]
-            return body_candidate
-
         def replace_fn(match):
             prefix, paren_content = match.groups()
             tag = "/*AUTOSENSE*/"
 
             # Find the start of the body in the original content
             body_start = match.end()
-            body = get_block_body(content, body_start)
+            body = self._extract_always_block_body(content, body_start)
 
             # Clean body for signal extraction
             clean_body = self._strip_comments(body)
@@ -927,31 +917,8 @@ class VerilogExpander:
             # Filter unique signals that exist in project and aren't keywords
             detected_sigs = set()
             for name in all_ids:
-                if name in local_signals and name not in keywords:
-                    # Check if it's only used as LHS
-                    all_matches = list(re.finditer(rf"\b{name}\b", clean_body))
-                    is_read = False
-                    for m in all_matches:
-                        suffix = clean_body[m.end() :].lstrip()
-                        if suffix.startswith("["):
-                            bracket_stack = 0
-                            skip_idx = 0
-                            for char in suffix:
-                                if char == "[":
-                                    bracket_stack += 1
-                                elif char == "]":
-                                    bracket_stack -= 1
-                                skip_idx += 1
-                                if bracket_stack == 0:
-                                    break
-                            suffix = suffix[skip_idx:].lstrip()
-
-                        is_blocking_assign = suffix.startswith("=") and not suffix.startswith("==")
-                        is_nonblocking_assign = suffix.startswith("<=") and not suffix.startswith("<==")
-                        if not (is_blocking_assign or is_nonblocking_assign):
-                            is_read = True
-                            break
-                    if is_read:
+                if name in local_signals and name not in _AUTOSENSE_KEYWORDS:
+                    if self._signal_is_read(name, clean_body):
                         detected_sigs.add(name)
 
             if not detected_sigs:
@@ -975,6 +942,57 @@ class VerilogExpander:
             return f"{prefix}({new_paren})"
 
         return pattern.sub(replace_fn, content)
+
+    def _extract_always_block_body(self, full_content, start_pos):
+        """Extract the body of the always block starting after 'always @(...)'.
+        For a `begin ... end` body, balance begin/case/fork against
+        end/endcase/join; otherwise take up to the first ';'."""
+        body_candidate = full_content[start_pos:].strip()
+        if body_candidate.startswith("begin"):
+            stack = 0
+            for m in re.finditer(
+                r"\b(begin|end|case|endcase|fork|join)\b", body_candidate
+            ):
+                kw = m.group(1)
+                if kw in ("begin", "case", "fork"):
+                    stack += 1
+                elif kw in ("end", "endcase", "join"):
+                    stack -= 1
+
+                if stack == 0:
+                    return body_candidate[: m.end()]
+        else:
+            # Single statement, find first ';'
+            idx = body_candidate.find(";")
+            if idx != -1:
+                return body_candidate[: idx + 1]
+        return body_candidate
+
+    def _signal_is_read(self, name, clean_body):
+        """Heuristic: True if `name` appears in an always-block body as a read
+        (RHS / condition), not purely on the LHS of a blocking (=) or
+        non-blocking (<=) assignment. A bus index (`name[...]`) is skipped before
+        inspecting what follows, so `name[i] = ...` still counts as a write."""
+        for m in re.finditer(rf"\b{name}\b", clean_body):
+            suffix = clean_body[m.end() :].lstrip()
+            if suffix.startswith("["):
+                bracket_stack = 0
+                skip_idx = 0
+                for char in suffix:
+                    if char == "[":
+                        bracket_stack += 1
+                    elif char == "]":
+                        bracket_stack -= 1
+                    skip_idx += 1
+                    if bracket_stack == 0:
+                        break
+                suffix = suffix[skip_idx:].lstrip()
+
+            is_blocking_assign = suffix.startswith("=") and not suffix.startswith("==")
+            is_nonblocking_assign = suffix.startswith("<=") and not suffix.startswith("<==")
+            if not (is_blocking_assign or is_nonblocking_assign):
+                return True
+        return False
 
     def expand_module_block(self, content: str, file_path: str) -> str:
         """Expands all tags within a single module block."""

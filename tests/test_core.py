@@ -10,6 +10,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 # 添加專案根目錄到 sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -179,6 +181,28 @@ class TestBugFixes:
         sensitivity_line = [l for l in result.splitlines() if "AUTOSENSE" in l][0]
         assert "state" in sensitivity_line
         assert "idle" in sensitivity_line
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Known gap: expand_autosense does not mask comments, so a "
+        "commented-out always block is still expanded. Remove this marker "
+        "when comment-masking is added to AUTOSENSE.",
+    )
+    def test_autosense_ignores_commented_out_block(self):
+        """已知缺口：expand_autosense 用 pattern.sub 不遮罩註解，會展開被 `//`
+        註解掉的 always 區塊。autoinst 有遮罩、autosense 沒有——這個紅燈標記
+        把缺口鎖住，修好遮罩後 strict xfail 會轉成 xpass 報錯，提醒移除標記。"""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m;
+            reg a;
+            reg b;
+            // always @(/*AUTOSENSE*/) b = a;
+        endmodule
+        """
+        result = expander.expand_autosense(content, "m.sv")
+        assert result == content  # commented-out tag must be left untouched
 
     def test_autoinst_no_double_comma_when_surrounded(self):
         """Bug 3: AUTOINST 前後已有手動連線時不得產生 `,,`"""
