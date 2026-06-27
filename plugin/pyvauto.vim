@@ -30,24 +30,24 @@ function! s:Run(delete) abort
 
     " Build the command (add --delete for the un-expand path)
     let l:flag = a:delete ? ' --delete' : ''
+    let l:verb = a:delete ? 'Deleting' : 'Expanding'
+    let l:noun = a:delete ? 'deletion' : 'expansion'
     let l:cmd = shellescape(g:pyvauto_python) . ' ' .
               \ shellescape(g:pyvauto_script) . l:flag . ' ' .
               \ shellescape(expand('%:p'))
 
     " Run it and capture the output
-    echo a:delete ? "Deleting Verilog auto tags..." : "Expanding Verilog auto tags..."
+    echo l:verb . ' Verilog auto tags...'
     let l:output = system(l:cmd)
 
     if v:shell_error == 0
         " Reload the file and restore the cursor
         edit!
         call setpos('.', l:save_cursor)
-        echo a:delete ? "Verilog auto deletion completed successfully!"
-                    \ : "Verilog auto expansion completed successfully!"
+        echo 'Verilog auto ' . l:noun . ' completed successfully!'
     else
         echohl ErrorMsg
-        echo a:delete ? "Error deleting Verilog auto tags:"
-                    \ : "Error expanding Verilog auto tags:"
+        echo 'Error ' . tolower(l:verb) . ' Verilog auto tags:'
         echo l:output
         echohl None
     endif

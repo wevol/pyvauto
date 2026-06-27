@@ -145,6 +145,20 @@ _AUTOSENSE_KEYWORDS = {
 }
 
 
+# "module … endmodule" block; expanders and deleters are applied per block.
+_MODULE_BLOCK_RE = re.compile(
+    r"^[\t ]*module\s+\w+.*?\bendmodule\b",
+    re.DOTALL | re.IGNORECASE | re.MULTILINE,
+)
+
+# Body-context auto-signal blocks (AUTOWIRE/AUTOLOGIC/AUTOINPUT/AUTOOUTPUT);
+# un-expand strips the generated block and keeps the bare tag.
+_AUTO_SIGNAL_BLOCK_RE = re.compile(
+    r"(/\*(?:AUTOWIRE|AUTOLOGIC|AUTOINPUT|AUTOOUTPUT)\*/)\s*// Beginning.*?// End of automatics",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
 def _widths_mismatch(w1: str, w2: str) -> bool:
     """True if two width strings represent different widths (ignoring whitespace)."""
     if not w1 or not w2:
@@ -1014,59 +1028,35 @@ class VerilogExpander:
         content = self.expand_autoarg(content, file_path)
         return content
 
-    def expand_all(self, content: str, file_path: str = "") -> str:
-        # Find all module ... endmodule blocks
-        # Pattern to capture module block including everything until endmodule
-        pattern = re.compile(
-            r"^[\t ]*module\s+\w+.*?\bendmodule\b",
-            re.DOTALL | re.IGNORECASE | re.MULTILINE,
+    def _per_module_block(self, content, file_path, block_fn):
+        """Apply block_fn(block_text, file_path) to each module…endmodule block."""
+        return _MODULE_BLOCK_RE.sub(
+            lambda m: block_fn(m.group(0), file_path), content
         )
 
-        def replace_fn(match):
-            block_text = match.group(0)
-            return self.expand_module_block(block_text, file_path)
-
-        return pattern.sub(replace_fn, content)
+    def expand_all(self, content: str, file_path: str = "") -> str:
+        return self._per_module_block(content, file_path, self.expand_module_block)
 
     def delete_all(self, content: str, file_path: str = "") -> str:
         """反展開：對每個 module block 移除自動產生內容，只留裸 tag。"""
-        pattern = re.compile(
-            r"^[\t ]*module\s+\w+.*?\bendmodule\b",
-            re.DOTALL | re.IGNORECASE | re.MULTILINE,
-        )
-
-        def replace_fn(match):
-            return self.delete_module_block(match.group(0), file_path)
-
-        return pattern.sub(replace_fn, content)
+        return self._per_module_block(content, file_path, self.delete_module_block)
 
     def delete_module_block(self, content: str, file_path: str) -> str:
         """Reverse every AUTO expansion within a single module block."""
-        content = self._delete_autoinst(content, file_path)
-        for tag in ("AUTOWIRE", "AUTOLOGIC", "AUTOINPUT", "AUTOOUTPUT"):
-            content = self._delete_auto_signals(content, tag)  # body form
-        content = self._delete_autosense(content, file_path)
+        content = self._delete_autoinst(content)
+        # body-form AUTOWIRE/AUTOLOGIC/AUTOINPUT/AUTOOUTPUT: drop the
+        # // Beginning … // End block, keep the bare tag. The block's presence is
+        # itself proof of a real expansion, so commented-out tags (which have no
+        # such block) are left alone — no masking needed here.
+        content = _AUTO_SIGNAL_BLOCK_RE.sub(lambda m: m.group(1), content)
+        content = self._delete_autosense(content)
         # AUTOARG keeps its tag after expansion (reversible). ANSI AUTOINPUT/
         # AUTOOUTPUT replace the tag with port decls (tag is gone), so only their
-        # body form is reversible — already handled above by _delete_auto_signals.
+        # body form is reversible — handled by the block sub above.
         content = self._delete_header_tag(content, "AUTOARG")
         return content
 
-    def _delete_auto_signals(self, content, tag_name):
-        """Remove the `// Beginning … // End of automatics` block after a
-        body-context tag, leaving the bare tag. The block's presence is itself
-        proof the tag was really expanded, so a commented-out tag (which has no
-        such block) is left untouched — no masking needed here."""
-        regex = re.compile(
-            rf"(/\*{tag_name}\*/)\s*// Beginning.*?// End of automatics",
-            re.DOTALL | re.IGNORECASE,
-        )
-        match = regex.search(content)
-        if match is None:
-            return content
-        return self._splice(content, match, match.group(1))
-
-    def _delete_autoinst(self, content, file_path=""):
+    def _delete_autoinst(self, content):
         """Reverse /*AUTOINST*/: keep manual connections written before the tag,
         drop the auto-generated connections after it (up to the instance ')')."""
         pattern = re.compile(
@@ -1079,11 +1069,11 @@ class VerilogExpander:
                 return match.group(0)
             port_block = match.group(4)
             tag = match.group(5)
-            head = port_block[: port_block.find(tag)]
-            after = port_block[port_block.find(tag) + len(tag) :]
+            tag_end = port_block.find(tag) + len(tag)
+            after = port_block[tag_end:]
             # 丟棄 tag 後的自動連線，只保留 ')' 那一行的縮排（最後一個換行起）
             trailing = after[after.rfind("\n") :] if "\n" in after else ""
-            new_block = head + tag + trailing
+            new_block = port_block[:tag_end] + trailing
             return match.group(0).replace(port_block, new_block, 1)
 
         return self._apply_masked_replacements(content, pattern, replace_fn)
@@ -1107,7 +1097,7 @@ class VerilogExpander:
             header += " " + params.strip()
         return self._splice(content, match, f"{header} ({new_port_block}\n);")
 
-    def _delete_autosense(self, content, file_path=""):
+    def _delete_autosense(self, content):
         """Reverse /*AUTOSENSE*/: drop the auto-filled sensitivity signals after
         the tag, leaving `always @(/*AUTOSENSE*/)`."""
         pattern = re.compile(
