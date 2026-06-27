@@ -476,15 +476,6 @@ class VerilogExpander:
     ):
         """Render the auto-generated /*AUTOINST*/ port connections: group by
         direction, add commas, and append width-mismatch warning comments."""
-        outputs = [p for p in ports_to_expand if p.direction == "output"]
-        inouts = [p for p in ports_to_expand if p.direction == "inout"]
-        inputs = [p for p in ports_to_expand if p.direction == "input"]
-        others = [
-            p
-            for p in ports_to_expand
-            if p.direction not in ["output", "input", "inout"]
-        ]
-
         lines = []
         # Track warning-comment suffixes keyed by line index so that any
         # later comma-insertion step puts the comma BEFORE the comment.
@@ -502,23 +493,22 @@ class VerilogExpander:
                 )
             return line
 
-        if outputs:
-            lines.append("    // Outputs")
-            for p in outputs:
-                lines.append(format_p(p))
+        # Grouped directions first, each under its header, then any others
+        # in original order.
+        for direction, header in (
+            ("output", "    // Outputs"),
+            ("inout", "    // Inouts"),
+            ("input", "    // Inputs"),
+        ):
+            members = [p for p in ports_to_expand if p.direction == direction]
+            if members:
+                lines.append(header)
+                for p in members:
+                    lines.append(format_p(p))
 
-        if inouts:
-            lines.append("    // Inouts")
-            for p in inouts:
+        for p in ports_to_expand:
+            if p.direction not in ("output", "inout", "input"):
                 lines.append(format_p(p))
-
-        if inputs:
-            lines.append("    // Inputs")
-            for p in inputs:
-                lines.append(format_p(p))
-
-        for p in others:
-            lines.append(format_p(p))
 
         # Add commas to port lines
         port_indices = [
@@ -544,18 +534,33 @@ class VerilogExpander:
 
         return "\n".join(lines)
 
-    def _apply_masked_replacements(self, content, pattern, replace_fn):
-        """Scan masked content so instantiations inside comments don't get
-        expanded, while re-matching the ORIGINAL content at the same byte
-        offsets to recover real group text (_mask_comments preserves layout,
-        so offsets line up). Splice the replacements back into the content."""
+    def _iter_masked_matches(self, content, pattern):
+        """Yield (masked_match, real_match) for each occurrence of `pattern` that
+        is NOT inside a comment. The scan runs on masked content (comments
+        blanked, AUTO tags preserved, layout/offsets unchanged by _mask_comments)
+        and re-matches the ORIGINAL content at the masked match's offset to
+        recover real group text. real_match is None when the original does not
+        re-match there. This is the single place the mask + re-match-at-offset
+        idiom lives."""
         masked = self._mask_comments(content)
+        for masked_match in pattern.finditer(masked):
+            yield masked_match, pattern.match(content, masked_match.start())
+
+    @staticmethod
+    def _splice(content, match, replacement):
+        """Replace `match`'s span in `content` with `replacement`."""
+        return content[: match.start()] + replacement + content[match.end() :]
+
+    def _apply_masked_replacements(self, content, pattern, replace_fn):
+        """Expand every occurrence of `pattern` not inside a comment, splicing the
+        results (built from the real, unmasked match) back into the content."""
         replacements = []
-        for match in pattern.finditer(masked):
-            real_match = pattern.match(content, match.start())
+        for masked_match, real_match in self._iter_masked_matches(content, pattern):
             if real_match is None:
                 continue
-            replacements.append((match.start(), match.end(), replace_fn(real_match)))
+            replacements.append(
+                (masked_match.start(), masked_match.end(), replace_fn(real_match))
+            )
 
         if not replacements:
             return content
@@ -570,17 +575,11 @@ class VerilogExpander:
         return "".join(parts)
 
     def _first_unmasked_match(self, content, pattern):
-        """Return pattern's first match in `content` that is NOT inside a comment.
-        Locate it in masked content (comments blanked, AUTO tags preserved via
-        _mask_comments), then re-match the original at that offset to recover real
-        group text. Returns None if there is no such real match. Shared by the
-        single-match tag expanders (AUTOARG / AUTOWIRE / AUTOLOGIC / AUTOINPUT /
-        AUTOOUTPUT); AUTOINST / AUTOSENSE use the multi-match
-        _apply_masked_replacements."""
-        masked_match = pattern.search(self._mask_comments(content))
-        if masked_match is None:
-            return None
-        return pattern.match(content, masked_match.start())
+        """Return `pattern`'s first match in `content` that is NOT inside a
+        comment, re-matched against the original text (or None if there is none)."""
+        for _masked, real in self._iter_masked_matches(content, pattern):
+            return real
+        return None
 
     def expand_autoarg(self, content: str, file_path: str) -> str:
         """
@@ -654,7 +653,7 @@ class VerilogExpander:
         if params:
             header += " " + params.strip()
         replacement = f"{header} ({new_port_block.rstrip()}\n);"
-        return content[: match.start()] + replacement + content[match.end() :]
+        return self._splice(content, match, replacement)
 
     def _collect_header_ports(self, port_block, autoarg_tag, is_ansi):
         """Collect names of ports already listed in an AUTOARG module header.
@@ -683,16 +682,16 @@ class VerilogExpander:
         if not ports_to_expand:
             return ""
         if is_ansi:
-            # ANSI Mode: Generate full declarations, each on a new line
-            decls = []
-            for p in ports_to_expand:
-                width = f"{p.width} " if p.width else ""
-                decls.append(f"{p.direction} {width}{p.name}")
+            # ANSI Mode: full declarations ('direction [width] name'), one per line
+            decls = [
+                f"{p.direction} {f'{p.width} ' if p.width else ''}{p.name}"
+                for p in ports_to_expand
+            ]
             return ",\n    ".join(decls)
 
         # Non-ANSI Mode: Names only, wrapped to 80 chars
         names = [p.name for p in ports_to_expand]
-        return self._wrap_names(names, "    ", 80)
+        return self._wrap_names(names, "    ")
 
     @staticmethod
     def _wrap_names(items, indent_str, limit=80):
@@ -724,7 +723,7 @@ class VerilogExpander:
         )
 
         match = self._first_unmasked_match(content, regex)
-        if not match:
+        if match is None:
             return content
 
         print(f"Found {tag_name} in {file_path}")
@@ -739,7 +738,7 @@ class VerilogExpander:
             print(f"  {tag_name}: {decl}")
 
         if not new_signals:
-            return content[: match.start()] + tag + content[match.end() :]
+            return self._splice(content, match, tag)
 
         # 格式化輸出
         signals_str = "\n    ".join(new_signals)
@@ -749,7 +748,7 @@ class VerilogExpander:
             f"    {signals_str}\n    // End of automatics"
         )
 
-        return content[: match.start()] + replacement + content[match.end() :]
+        return self._splice(content, match, replacement)
 
     def expand_autowire(self, content: str, file_path: str) -> str:
         """擴展 /*AUTOWIRE*/"""
@@ -836,10 +835,8 @@ class VerilogExpander:
             )
 
             if not new_decls:
-                return (
-                    content[: ansi_match.start()]
-                    + ansi_match.group(0).replace(tag, "")
-                    + content[ansi_match.end() :]
+                return self._splice(
+                    content, ansi_match, ansi_match.group(0).replace(tag, "")
                 )
 
             tag_index = port_block.find(tag)
@@ -854,11 +851,7 @@ class VerilogExpander:
             if params:
                 header += " " + params.strip()
             replacement = f"{header} ({new_port_block.rstrip()}\n);"
-            return (
-                content[: ansi_match.start()]
-                + replacement
-                + content[ansi_match.end() :]
-            )
+            return self._splice(content, ansi_match, replacement)
 
         # 2. Non-ANSI body context
         body_regex = re.compile(
@@ -866,7 +859,7 @@ class VerilogExpander:
             re.DOTALL | re.IGNORECASE,
         )
         match = self._first_unmasked_match(content, body_regex)
-        if not match:
+        if match is None:
             return content
 
         print(f"Found {tag_name} in body of {file_path}")
@@ -880,7 +873,7 @@ class VerilogExpander:
         )
 
         if not new_decls:
-            return content[: match.start()] + tag + content[match.end() :]
+            return self._splice(content, match, tag)
 
         comment_type = "inputs" if direction == "input" else "outputs"
         block_content = "\n    ".join(new_decls)
@@ -888,7 +881,7 @@ class VerilogExpander:
             f"/*{tag_name}*/\n    // Beginning of automatic {comment_type}\n"
             f"    {block_content}\n    // End of automatics"
         )
-        return content[: match.start()] + replacement + content[match.end() :]
+        return self._splice(content, match, replacement)
 
     def expand_autoinput(self, content: str, file_path: str) -> str:
         """擴展 /*AUTOINPUT*/"""
