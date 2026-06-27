@@ -30,19 +30,19 @@ cd pyvauto
 
 ## Vim 整合（主要用途）
 
-本專案內附 Vim 插件 `plugin/verilog_auto.vim`，透過呼叫系統的 Python 3 來執行擴展，因此**即使你的 Vim 只內建 Python 2.7 也能使用**。
+本專案內附 Vim 插件 `plugin/pyvauto.vim`，透過呼叫系統的 Python 3 來執行擴展，因此**即使你的 Vim 只內建 Python 2.7 也能使用**。
 
 ```vim
 " 在 .vimrc 中將專案目錄加入 runtimepath
 set runtimepath+=/path/to/pyvauto
 
 " 若系統 Python 3 指令不是 'python3' 可自訂
-let g:verilog_auto_python = 'python3'
+let g:pyvauto_python = 'python3'
 ```
 
 在 Verilog/SystemVerilog 檔案 (`.v` / `.sv`) 中：
 
-- 按 **`\va`** 或 **`F5`**，或執行 **`:VerilogAuto`**
+- 按 **`\va`** 或 **`F5`**，或執行 **`:Pyvauto`**
 - 插件會自動保存檔案 → 呼叫 `pyvauto.py` 擴展 → 重新載入
 
 完整設定（自訂快捷鍵、保存時自動擴展、路徑指定、故障排除）請見 [VIM_INTEGRATION.md](VIM_INTEGRATION.md)。
@@ -88,7 +88,7 @@ endmodule
 ## 專案結構
 
 - `pyvauto.py`: 單檔本體，整合 Regex 解析器、擴展邏輯與 CLI（零外部依賴）。
-- `plugin/verilog_auto.vim`: Vim 插件，呼叫 `pyvauto.py` 完成擴展。
+- `plugin/pyvauto.vim`: Vim 插件，呼叫 `pyvauto.py` 完成擴展。
 - `VIM_INTEGRATION.md`: Vim 整合與設定的完整說明。
 - `tests/`: pytest 單元測試與 `*.sv` 驗證案例。
 

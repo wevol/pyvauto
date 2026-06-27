@@ -28,19 +28,19 @@ cd pyvauto
 
 ## Vim integration (primary use case)
 
-The bundled Vim plugin `plugin/verilog_auto.vim` shells out to the system Python 3 to run the expansion, so **it works even if your Vim is only built with Python 2.7**.
+The bundled Vim plugin `plugin/pyvauto.vim` shells out to the system Python 3 to run the expansion, so **it works even if your Vim is only built with Python 2.7**.
 
 ```vim
 " add the project directory to runtimepath in your .vimrc
 set runtimepath+=/path/to/pyvauto
 
 " override if your system Python 3 command isn't 'python3'
-let g:verilog_auto_python = 'python3'
+let g:pyvauto_python = 'python3'
 ```
 
 In a Verilog/SystemVerilog file (`.v` / `.sv`):
 
-- press **`\va`** or **`F5`**, or run **`:VerilogAuto`**
+- press **`\va`** or **`F5`**, or run **`:Pyvauto`**
 - the plugin saves the buffer → calls `pyvauto.py` to expand → reloads the file
 
 For the full setup (custom mappings, expand-on-save, explicit paths, troubleshooting) see [VIM_INTEGRATION.md](VIM_INTEGRATION.md).
@@ -86,7 +86,7 @@ endmodule
 ## Project structure
 
 - `pyvauto.py`: the single-file core — regex parser, expansion logic, and CLI (zero external dependencies).
-- `plugin/verilog_auto.vim`: the Vim plugin that calls `pyvauto.py`.
+- `plugin/pyvauto.vim`: the Vim plugin that calls `pyvauto.py`.
 - `VIM_INTEGRATION.md`: full Vim integration and configuration guide.
 - `tests/`: pytest unit tests and `*.sv` verification fixtures.
 

@@ -47,10 +47,10 @@ Or copy the plugin file manually:
 
 ```bash
 # Linux/macOS
-cp plugin/verilog_auto.vim ~/.vim/plugin/
+cp plugin/pyvauto.vim ~/.vim/plugin/
 
 # Windows
-copy plugin\verilog_auto.vim %USERPROFILE%\vimfiles\plugin\
+copy plugin\pyvauto.vim %USERPROFILE%\vimfiles\plugin\
 ```
 
 ### 3. Configuration (optional)
@@ -59,16 +59,16 @@ Customize in your `.vimrc`:
 
 ```vim
 " if your Python 3 executable isn't 'python' (e.g. it's 'python3')
-let g:verilog_auto_python = 'python3'
+let g:pyvauto_python = 'python3'
 
 " if pyvauto.py needs an explicit path
-let g:verilog_auto_script = '/path/to/pyvauto/pyvauto.py'
+let g:pyvauto_script = '/path/to/pyvauto/pyvauto.py'
 
 " expand automatically on save (optional)
-let g:verilog_auto_on_save = 1
+let g:pyvauto_on_save = 1
 
 " disable the default mappings (if you want your own)
-let g:verilog_auto_no_mappings = 1
+let g:pyvauto_no_mappings = 1
 ```
 
 ---
@@ -85,7 +85,7 @@ In a Verilog file (`.v` or `.sv`):
 ### Option 2: command
 
 ```vim
-:VerilogAuto
+:Pyvauto
 ```
 
 ### Workflow
@@ -106,13 +106,13 @@ To use a different shortcut:
 
 ```vim
 " disable the default mappings
-let g:verilog_auto_no_mappings = 1
+let g:pyvauto_no_mappings = 1
 
 " map to <Leader>e (e.g. \e)
-nnoremap <silent> <Leader>e :VerilogAuto<CR>
+nnoremap <silent> <Leader>e :Pyvauto<CR>
 
 " or use another function key
-nnoremap <silent> <F9> :VerilogAuto<CR>
+nnoremap <silent> <F9> :Pyvauto<CR>
 ```
 
 ---
@@ -123,14 +123,14 @@ nnoremap <silent> <F9> :VerilogAuto<CR>
 
 ```vim
 " specify the full path to the Python executable
-let g:verilog_auto_python = '/usr/bin/python3'   " or e.g. C:/Python313/python.exe on Windows
+let g:pyvauto_python = '/usr/bin/python3'   " or e.g. C:/Python313/python.exe on Windows
 ```
 
 ### Error: pyvauto.py not found
 
 ```vim
 " use an absolute path
-let g:verilog_auto_script = '/path/to/pyvauto/pyvauto.py'
+let g:pyvauto_script = '/path/to/pyvauto/pyvauto.py'
 ```
 
 ### Check the configuration
@@ -138,8 +138,8 @@ let g:verilog_auto_script = '/path/to/pyvauto/pyvauto.py'
 Run inside Vim:
 
 ```vim
-:echo g:verilog_auto_python
-:echo g:verilog_auto_script
+:echo g:pyvauto_python
+:echo g:pyvauto_script
 ```
 
 to confirm the paths are correct.
