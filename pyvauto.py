@@ -569,6 +569,19 @@ class VerilogExpander:
         parts.append(content[cursor:])
         return "".join(parts)
 
+    def _first_unmasked_match(self, content, pattern):
+        """Return pattern's first match in `content` that is NOT inside a comment.
+        Locate it in masked content (comments blanked, AUTO tags preserved via
+        _mask_comments), then re-match the original at that offset to recover real
+        group text. Returns None if there is no such real match. Shared by the
+        single-match tag expanders (AUTOARG / AUTOWIRE / AUTOLOGIC / AUTOINPUT /
+        AUTOOUTPUT); AUTOINST / AUTOSENSE use the multi-match
+        _apply_masked_replacements."""
+        masked_match = pattern.search(self._mask_comments(content))
+        if masked_match is None:
+            return None
+        return pattern.match(content, masked_match.start())
+
     def expand_autoarg(self, content: str, file_path: str) -> str:
         """
         Expands /*AUTOARG*/ in module headers.
@@ -580,8 +593,9 @@ class VerilogExpander:
             re.DOTALL | re.IGNORECASE,
         )
 
-        match = regex.search(content)
-        if not match:
+        # Ignore a commented-out /*AUTOARG*/ header by scanning masked content.
+        match = self._first_unmasked_match(content, regex)
+        if match is None:
             return content
 
         # Groups: 1: module start, 2: module name, 3: params, 4: port list content, 5: tag
@@ -709,7 +723,7 @@ class VerilogExpander:
             re.DOTALL | re.IGNORECASE,
         )
 
-        match = regex.search(content)
+        match = self._first_unmasked_match(content, regex)
         if not match:
             return content
 
@@ -809,7 +823,7 @@ class VerilogExpander:
             rf"(\bmodule\s+(\w+)\s*)(#\s*\(.*?\))?\s*\(([^;]*?(/\*{tag_name}\*/)[^;]*?)\)\s*;",
             re.DOTALL | re.IGNORECASE,
         )
-        ansi_match = ansi_regex.search(content)
+        ansi_match = self._first_unmasked_match(content, ansi_regex)
 
         if ansi_match:
             mod_start, mod_name, params, port_block, tag = ansi_match.groups()
@@ -851,7 +865,7 @@ class VerilogExpander:
             rf"(/\*{tag_name}\*/)(\s*// Beginning.*?// End of automatics)?",
             re.DOTALL | re.IGNORECASE,
         )
-        match = body_regex.search(content)
+        match = self._first_unmasked_match(content, body_regex)
         if not match:
             return content
 
@@ -941,7 +955,9 @@ class VerilogExpander:
             print(f"  AUTOSENSE: Found signals {sorted_sigs}")
             return f"{prefix}({new_paren})"
 
-        return pattern.sub(replace_fn, content)
+        # Scan masked content so commented-out `always @(/*AUTOSENSE*/...)`
+        # blocks are ignored, matching AUTOINST's comment-safe behavior.
+        return self._apply_masked_replacements(content, pattern, replace_fn)
 
     def _extract_always_block_body(self, full_content, start_pos):
         """Extract the body of the always block starting after 'always @(...)'.

@@ -10,8 +10,6 @@
 import sys
 from pathlib import Path
 
-import pytest
-
 # 添加專案根目錄到 sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -182,16 +180,9 @@ class TestBugFixes:
         assert "state" in sensitivity_line
         assert "idle" in sensitivity_line
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Known gap: expand_autosense does not mask comments, so a "
-        "commented-out always block is still expanded. Remove this marker "
-        "when comment-masking is added to AUTOSENSE.",
-    )
     def test_autosense_ignores_commented_out_block(self):
-        """已知缺口：expand_autosense 用 pattern.sub 不遮罩註解，會展開被 `//`
-        註解掉的 always 區塊。autoinst 有遮罩、autosense 沒有——這個紅燈標記
-        把缺口鎖住，修好遮罩後 strict xfail 會轉成 xpass 報錯，提醒移除標記。"""
+        """回歸：expand_autosense 走 _apply_masked_replacements 遮罩註解，
+        被 `//` 註解掉的 always 區塊不得被展開（與 autoinst 行為一致）。"""
         project = VerilogProject()
         expander = VerilogExpander(project)
         content = """
@@ -203,6 +194,61 @@ class TestBugFixes:
         """
         result = expander.expand_autosense(content, "m.sv")
         assert result == content  # commented-out tag must be left untouched
+
+    def test_autoarg_skips_commented_out_header(self):
+        """expand_autoarg 必須遮罩註解：一個被 `//` 註解掉、且排在前面的
+        module header 不得被選中，真正的 module 才該被展開。"""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+// module old (/*AUTOARG*/);
+module m (
+    input clk,
+    /*AUTOARG*/
+);
+    input rst;
+    output done;
+endmodule
+"""
+        result = expander.expand_autoarg(content, "m.sv")
+        # commented-out header left untouched
+        assert "// module old (/*AUTOARG*/);" in result
+        # real module m's header (everything up to the closing ');') must gain
+        # the expanded ports — rst/done in the body alone don't prove expansion.
+        header = result.split("module m")[1].split(");")[0]
+        assert "rst" in header and "done" in header
+
+    def test_autowire_ignores_commented_out_tag(self):
+        """遮罩一致性：被 `//` 註解掉的 /*AUTOWIRE*/ 不得被展開
+        （_expand_auto_signals，AUTOLOGIC 共用同一路徑）。"""
+        project = VerilogProject()
+        sub = "module sub (input clk, output [7:0] dat);\nendmodule\n"
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        expander = VerilogExpander(project)
+        top = """module top;
+    // /*AUTOWIRE*/
+    sub u (.clk(clk), .dat(dat));
+endmodule
+"""
+        result = expander.expand_all(top, "top.sv")
+        assert result == top  # commented tag -> no expansion
+
+    def test_autoinput_ignores_commented_out_tag(self):
+        """遮罩一致性：被 `//` 註解掉的 /*AUTOINPUT*/ 不得被展開
+        （_expand_auto_port，AUTOOUTPUT 共用同一路徑）。"""
+        project = VerilogProject()
+        sub = "module sub (input [3:0] sel);\nendmodule\n"
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        expander = VerilogExpander(project)
+        top = """module top;
+    // /*AUTOINPUT*/
+    sub u (.sel(sel));
+endmodule
+"""
+        result = expander.expand_all(top, "top.sv")
+        assert result == top  # commented tag -> no expansion
 
     def test_autoinst_no_double_comma_when_surrounded(self):
         """Bug 3: AUTOINST 前後已有手動連線時不得產生 `,,`"""
