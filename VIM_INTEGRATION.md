@@ -79,13 +79,14 @@ let g:pyvauto_no_mappings = 1
 
 In a Verilog file (`.v` or `.sv`):
 
-- press **`\va`** (backslash + va)
-- or press **`F5`**
+- expand: press **`\va`** (backslash + va) or **`F5`**
+- un-expand (strip auto-generated content): press **`\nva`** or **`F6`**
 
 ### Option 2: command
 
 ```vim
-:Pyvauto
+:Pyvauto    " expand
+:NVA        " un-expand — remove auto-generated content, keep the bare tags
 ```
 
 ### Workflow

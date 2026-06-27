@@ -42,8 +42,9 @@ let g:pyvauto_python = 'python3'
 
 在 Verilog/SystemVerilog 檔案 (`.v` / `.sv`) 中：
 
-- 按 **`\va`** 或 **`F5`**，或執行 **`:Pyvauto`**
-- 插件會自動保存檔案 → 呼叫 `pyvauto.py` 擴展 → 重新載入
+- 展開：按 **`\va`** 或 **`F5`**，或執行 **`:Pyvauto`**
+- 反展開：按 **`\nva`** 或 **`F6`**，或執行 **`:NVA`**（清除自動產生內容、只留裸 tag）
+- 插件會自動保存檔案 → 呼叫 `pyvauto.py` → 重新載入
 
 完整設定（自訂快捷鍵、保存時自動擴展、路徑指定、故障排除）請見 [VIM_INTEGRATION.md](VIM_INTEGRATION.md)。
 
@@ -55,6 +56,9 @@ let g:pyvauto_python = 'python3'
 
 ```bash
 python pyvauto.py <file1.sv> <file2.sv> ...
+
+# 反向操作 —— 清除自動產生內容、只留裸 tag（對應 emacs verilog-delete-auto）
+python pyvauto.py --delete <file1.sv> ...
 ```
 
 > ⚠️ CLI 會索引**當前工作目錄 (`.`)** 來尋找模組定義，而非目標檔案所在目錄。

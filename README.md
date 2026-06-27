@@ -40,8 +40,9 @@ let g:pyvauto_python = 'python3'
 
 In a Verilog/SystemVerilog file (`.v` / `.sv`):
 
-- press **`\va`** or **`F5`**, or run **`:Pyvauto`**
-- the plugin saves the buffer → calls `pyvauto.py` to expand → reloads the file
+- press **`\va`** or **`F5`**, or run **`:Pyvauto`** to expand
+- press **`\nva`** or **`F6`**, or run **`:NVA`** to **un-expand** (strip the auto-generated content, leaving the bare tags)
+- the plugin saves the buffer → calls `pyvauto.py` → reloads the file
 
 For the full setup (custom mappings, expand-on-save, explicit paths, troubleshooting) see [VIM_INTEGRATION.md](VIM_INTEGRATION.md).
 
@@ -53,6 +54,9 @@ You can also expand files in place straight from the command line (handy for CI,
 
 ```bash
 python pyvauto.py <file1.sv> <file2.sv> ...
+
+# reverse it — strip auto-generated content, leave the bare tags (like emacs verilog-delete-auto)
+python pyvauto.py --delete <file1.sv> ...
 ```
 
 > ⚠️ The CLI indexes the **current working directory (`.`)** to find module definitions, not the target file's directory.
