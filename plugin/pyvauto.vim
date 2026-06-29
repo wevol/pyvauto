@@ -10,15 +10,44 @@ endif
 let g:loaded_pyvauto = 1
 
 " Python 3 executable (override if it isn't 'python3' on your system)
+" Auto-detect a usable Python 3. Skips the Microsoft Store 'App execution
+" alias' stub (WindowsApps\python3.exe), which hangs forever under system().
+function! s:DetectPython() abort
+    for l:cand in ['python3', 'python', 'py']
+        if executable(l:cand)
+            " exepath() resolves the real binary; reject the Store stub.
+            if exepath(l:cand) =~? 'WindowsApps'
+                continue
+            endif
+            return l:cand
+        endif
+    endfor
+    return 'python3'  " last-resort fallback (Unix convention)
+endfunction
+
 if !exists('g:pyvauto_python')
-    let g:pyvauto_python = 'python3'
+    let g:pyvauto_python = s:DetectPython()
 endif
 
 " Path to pyvauto.py. Default: the project root one directory above this
 " plugin file (plugin/pyvauto.vim -> ../pyvauto.py).
 if !exists('g:pyvauto_script')
-    let g:pyvauto_script = expand('<sfile>:p:h:h') . '/pyvauto.py'
+    " Locate pyvauto.py relative to this plugin file. Two supported layouts:
+    "   1. flat install  — pyvauto.py sits NEXT TO pyvauto.vim
+    "                       (e.g. both copied into ~/.vim/plugin/)
+    "   2. repo layout    — pyvauto.vim in repo/plugin/, pyvauto.py one dir up
+    " Prefer the same dir; fall back to the parent. Whichever exists wins.
+    let s:dir = expand('<sfile>:p:h')
+    if filereadable(s:dir . '/pyvauto.py')
+        let g:pyvauto_script = s:dir . '/pyvauto.py'
+    else
+        let g:pyvauto_script = fnamemodify(s:dir, ':h') . '/pyvauto.py'
+    endif
 endif
+" Expand ~ / env vars so a user-supplied path (e.g. '~/.vim/plugin/pyvauto.py')
+" survives shellescape(), which would otherwise quote the literal ~ and break
+" the call (Python can't open a path starting with ~).
+let g:pyvauto_script = expand(g:pyvauto_script)
 
 " Shared runner: a:delete=0 expands, a:delete=1 un-expands (passes --delete).
 function! s:Run(delete) abort

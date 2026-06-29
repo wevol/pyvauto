@@ -43,15 +43,24 @@ Add the project directory to Vim's `runtimepath`:
 set runtimepath+=/path/to/pyvauto
 ```
 
-Or copy the plugin file manually:
+Or copy the files manually. **Copy `pyvauto.py` alongside `pyvauto.vim`** — the
+plugin auto-detects the script in its own directory, so no `g:pyvauto_script` is
+needed:
 
 ```bash
 # Linux/macOS
-cp plugin/pyvauto.vim ~/.vim/plugin/
+cp plugin/pyvauto.vim pyvauto.py ~/.vim/plugin/
 
 # Windows
 copy plugin\pyvauto.vim %USERPROFILE%\vimfiles\plugin\
+copy pyvauto.py        %USERPROFILE%\vimfiles\plugin\
 ```
+
+> Script path resolution: the plugin first looks for `pyvauto.py` **next to**
+> `pyvauto.vim` (flat install above), then falls back to the parent directory
+> (the repo layout, where `pyvauto.vim` lives in `plugin/` and `pyvauto.py` sits
+> one level up). If you copy *only* `pyvauto.vim` into `~/.vim/plugin/` without
+> `pyvauto.py`, set `g:pyvauto_script` explicitly.
 
 ### 3. Configuration (optional)
 
@@ -61,8 +70,8 @@ Customize in your `.vimrc`:
 " if your Python 3 executable isn't 'python' (e.g. it's 'python3')
 let g:pyvauto_python = 'python3'
 
-" if pyvauto.py needs an explicit path
-let g:pyvauto_script = '/path/to/pyvauto/pyvauto.py'
+" if pyvauto.py needs an explicit path (~ and $ENV vars are expanded for you)
+let g:pyvauto_script = '~/.vim/plugin/pyvauto.py'
 
 " expand automatically on save (optional)
 let g:pyvauto_on_save = 1
@@ -84,8 +93,10 @@ In a Verilog file (`.v` or `.sv`):
 
 ### Option 2: command
 
+Type these after the `:` in normal mode (they're Ex commands):
+
 ```vim
-:Pyvauto    " expand
+:VA         " expand (alias: :Pyvauto)
 :NVA        " un-expand — remove auto-generated content, keep the bare tags
 ```
 
@@ -132,6 +143,21 @@ let g:pyvauto_python = '/usr/bin/python3'   " or e.g. C:/Python313/python.exe on
 ```vim
 " use an absolute path
 let g:pyvauto_script = '/path/to/pyvauto/pyvauto.py'
+```
+
+### Error: `python3: can't open file '~/.vim/plugin/pyvauto.py'`
+
+A `~` (or `$HOME`) in the path that reaches Python *literally*. The plugin
+quotes `g:pyvauto_script` with `shellescape()` before calling Python, and the
+quoting stops the shell from expanding `~` — Python then can't find the path.
+
+Fixed since this version: the plugin runs `expand(g:pyvauto_script)` on load, so
+`~` and `$ENV` vars are resolved to an absolute path regardless of how you set
+it. If you still see this, you're on an old `pyvauto.vim` — update the plugin,
+or set an already-absolute path yourself:
+
+```vim
+let g:pyvauto_script = expand('~/.vim/plugin/pyvauto.py')
 ```
 
 ### Check the configuration
