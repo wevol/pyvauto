@@ -19,3 +19,6 @@ verible-*/
 # Claude Code local files (not published)
 CLAUDE.md
 .claude/
+
+# Brainstorming / spec / plan artifacts (not published)
+docs/superpowers/

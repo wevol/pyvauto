@@ -337,28 +337,91 @@ class VerilogProject:
         self.modules: Dict[str, VerilogModule] = {}
         self.parser = RegexVerilogParser()
 
+    def _index_file(self, full_path: str, _content: Optional[str] = None) -> None:
+        try:
+            if _content is None:
+                with open(
+                    full_path,
+                    "r",
+                    encoding="utf-8",
+                    errors="ignore",
+                    newline="",
+                ) as f:
+                    _content = f.read()
+            mods = self.parser.parse_file(_content, full_path)
+            for m in mods:
+                print(f"  Found module: {m.name}")
+                self.modules[m.name] = m
+        except Exception as e:
+            print(f"Error reading {full_path}: {e}")
+
     def add_directory(self, path: str):
         print(f"Indexing directory: {os.path.abspath(path)}")
         for root, _, files in os.walk(path):
             for file in files:
-                if (
-                    file.endswith((".v", ".sv")) and file != "test_top.sv"
-                ):  # Avoid indexing top as sub
-                    full_path = os.path.join(root, file)
-                    try:
-                        with open(
-                            full_path,
-                            "r",
-                            encoding="utf-8",
-                            errors="ignore",
-                            newline="",
-                        ) as f:
-                            mods = self.parser.parse_file(f.read(), full_path)
-                            for m in mods:
-                                print(f"  Found module: {m.name}")
-                                self.modules[m.name] = m
-                    except Exception as e:
-                        print(f"Error reading {full_path}: {e}")
+                if file.endswith((".v", ".sv")) and file != "test_top.sv":
+                    self._index_file(os.path.join(root, file))
+
+    def resolve(self, path: str, needed: Set[str]) -> None:
+        """Index only the modules in `needed` (plus any co-located in the
+        same files), parsing as few files as possible. Module names are
+        globally unique, so first-found wins."""
+        pending = set(needed)
+        if not pending:
+            return
+
+        # One cheap directory listing — file names only, no reads/parsing.
+        candidates = []                  # all candidate .v/.sv paths
+        by_basename = {}                 # '<name>' -> path, for the fast-path
+        for root, _, files in os.walk(path):
+            for file in files:
+                if file.endswith((".v", ".sv")) and file != "test_top.sv":
+                    full = os.path.join(root, file)
+                    candidates.append(full)
+                    by_basename.setdefault(os.path.splitext(file)[0], full)
+
+        print(f"Resolving {len(pending)} module(s) under {os.path.abspath(path)}")
+        parsed = set()
+
+        # B — filename fast-path: parse only '<name>.v' / '<name>.sv'.
+        for name in list(pending):
+            hit = by_basename.get(name)
+            if hit and hit not in parsed:
+                self._index_file(hit)
+                parsed.add(hit)
+                pending.difference_update(self.modules.keys())
+                if not pending:
+                    return
+
+        # A — early-stop fallback: lightweight text pre-filter, then full parse.
+        # Read each file once; skip files that provably declare none of the
+        # pending module names. Match `module <name>` tolerant of any
+        # whitespace (tab/newline/multi-space) with word boundaries, mirroring
+        # the parser — so a literal-space check can't miss `module\tfoo`, and
+        # `a` doesn't false-match `module abc`. False positives (e.g. a name in
+        # a comment) only cost a wasted parse; false negatives are impossible.
+        for full in candidates:
+            if not pending:
+                return
+            if full in parsed:
+                continue
+            try:
+                with open(
+                    full, "r", encoding="utf-8", errors="ignore", newline=""
+                ) as fh:
+                    content = fh.read()
+            except Exception:
+                continue
+            prefilter = re.compile(
+                r"\bmodule\s+(?:"
+                + "|".join(re.escape(n) for n in pending)
+                + r")\b"
+            )
+            if not prefilter.search(content):
+                continue
+            self._index_file(full, _content=content)
+            parsed.add(full)
+            pending.difference_update(self.modules.keys())
 
 
 class VerilogExpander:
@@ -1127,9 +1190,17 @@ def main():
         args = parser.parse_args()
 
         project = VerilogProject()
-        project.add_directory(".")
-
         expander = VerilogExpander(project)
+
+        # Index only the sub-modules the target files actually instantiate.
+        needed: Set[str] = set()
+        for fpath in args.files:
+            if not os.path.exists(fpath):
+                continue
+            with open(fpath, "r", encoding="utf-8", errors="ignore", newline="") as f:
+                for inst in project.parser.get_instantiations(f.read(), fpath):
+                    needed.add(inst["module_name"])
+        project.resolve(".", needed)
 
         for fpath in args.files:
             if not os.path.exists(fpath):
