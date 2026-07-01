@@ -66,6 +66,44 @@ class TestVerilogParser:
         assert "WIDTH" in modules[0].parameters
         assert "DEPTH" in modules[0].parameters
 
+    def test_parse_ports_multiple_vars_per_line(self):
+        """同一行以逗號分隔的多個 port 都必須被解析出來，
+        且共用該行的 direction 與 width。"""
+        parser = RegexVerilogParser()
+        content = """
+        module marg (/*AUTOARG*/);
+            input        clk, rst_n, en;
+            output [3:0] x, y;
+        endmodule
+        """
+        mod = parser.parse_file(content, "marg.sv")[0]
+
+        names = [p.name for p in mod.ports]
+        assert names == ["clk", "rst_n", "en", "x", "y"]
+
+        by_name = {p.name: p for p in mod.ports}
+        assert by_name["rst_n"].direction == "input"
+        assert by_name["en"].direction == "input"
+        assert by_name["y"].direction == "output"
+        # width is shared across the comma list
+        assert by_name["x"].width == "[3:0]"
+        assert by_name["y"].width == "[3:0]"
+
+    def test_parse_ports_ansi_repeated_direction_not_merged(self):
+        """ANSI 逐埠重複 direction（input a, input b）不可被逗號合併，
+        誤把後面的 'input' 當成 port 名稱。"""
+        parser = RegexVerilogParser()
+        content = "module m (input a, input b, output c);\nendmodule\n"
+        mod = parser.parse_file(content, "m.sv")[0]
+        assert [p.name for p in mod.ports] == ["a", "b", "c"]
+
+    def test_parse_ports_ansi_shared_direction_comma_list(self):
+        """ANSI 共用 direction 的逗號清單（input a, b, output c, d）全部收集。"""
+        parser = RegexVerilogParser()
+        content = "module m (input a, b, output c, d);\nendmodule\n"
+        mod = parser.parse_file(content, "m.sv")[0]
+        assert [p.name for p in mod.ports] == ["a", "b", "c", "d"]
+
 
 class TestVerilogExpander:
     """測試 Verilog 擴展器功能"""

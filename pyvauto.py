@@ -207,10 +207,22 @@ class RegexVerilogParser:
             r"(?m)^[\t ]*module\s+(\w+)\s*(#\s*\(.*?\))?\s*\((.*?)\)\s*;", re.DOTALL
         )
         self.param_re = re.compile(r"(\w+)\s*=\s*([^,)\s]+)")
+        # group(4) captures the whole comma-separated name list sharing one
+        # direction/type/width (e.g. `input [7:0] a, b, c`). The negative
+        # lookahead stops the list at the next declaration so an ANSI header
+        # like `input a, input b` is NOT merged into one port. Split group(4)
+        # with `_port_names` to get the individual names.
         self.port_re = re.compile(
-            r"(input|output|inout)\s+(?:(logic|reg|wire)\s+)?(?:(\[.*?\])\s+)?(\w+)",
+            r"(input|output|inout)\s+(?:(logic|reg|wire)\s+)?(?:(\[.*?\])\s+)?"
+            r"(\w+(?:\s*,\s*(?!input\b|output\b|inout\b)\w+)*)",
             re.MULTILINE,
         )
+
+    @staticmethod
+    def _port_names(name_group: str) -> List[str]:
+        """Split a port_re group(4) match into individual port names,
+        e.g. 'clk, rst_n,\\n en' -> ['clk', 'rst_n', 'en']."""
+        return [n.strip() for n in name_group.split(",")]
 
     def parse_file(self, content: str, file_path: str = "") -> List:
         """解析 Verilog 檔案內容並返回模組列表"""
@@ -243,28 +255,29 @@ class RegexVerilogParser:
 
             # 1. Parse ports from header (ANSI style)
             for p_match in self.port_re.finditer(port_block):
-                module.ports.append(
-                    VerilogPort(
-                        name=p_match.group(4),
-                        direction=p_match.group(1),
-                        port_type=p_match.group(2) or "wire",
-                        width=p_match.group(3) or "",
+                for name in self._port_names(p_match.group(4)):
+                    module.ports.append(
+                        VerilogPort(
+                            name=name,
+                            direction=p_match.group(1),
+                            port_type=p_match.group(2) or "wire",
+                            width=p_match.group(3) or "",
+                        )
                     )
-                )
 
             # 2. Parse ports from body (Non-ANSI style or mixed)
             if module_body:
                 for p_match in self.port_re.finditer(module_body):
-                    p_name = p_match.group(4)
-                    if not any(p.name == p_name for p in module.ports):
-                        module.ports.append(
-                            VerilogPort(
-                                name=p_name,
-                                direction=p_match.group(1),
-                                port_type=p_match.group(2) or "wire",
-                                width=p_match.group(3) or "",
+                    for p_name in self._port_names(p_match.group(4)):
+                        if not any(p.name == p_name for p in module.ports):
+                            module.ports.append(
+                                VerilogPort(
+                                    name=p_name,
+                                    direction=p_match.group(1),
+                                    port_type=p_match.group(2) or "wire",
+                                    width=p_match.group(3) or "",
+                                )
                             )
-                        )
 
             modules.append(module)
         return modules
@@ -741,7 +754,8 @@ class VerilogExpander:
             for p_match in self.project.parser.port_re.finditer(
                 self._strip_comments(port_block)
             ):
-                existing_ports.add(p_match.group(4))
+                for name in self.project.parser._port_names(p_match.group(4)):
+                    existing_ports.add(name)
         else:
             # Remove the tag before splitting
             clean_block = port_block.replace(autoarg_tag, "")
@@ -858,7 +872,8 @@ class VerilogExpander:
                 self._strip_comments(content_for_signals)
             ):
                 if p_match.group(1) == filter_direction:
-                    manual_decls[p_match.group(4)] = p_match.group(3) or ""
+                    for name in self.project.parser._port_names(p_match.group(4)):
+                        manual_decls[name] = p_match.group(3) or ""
 
         suffix = ";" if semicolon else ""
         decls: list = []
