@@ -196,10 +196,14 @@ class TestVerilogExpander:
         assert "logic [15:0] my_logic_sig;" in result
 
     def _arg_line(self, result):
-        """Return the AUTOARG name list (text between the tag and ');')."""
+        """Return the AUTOARG port names (between the tag and ');'),
+        excluding // group-header comment lines."""
         start = result.find("/*AUTOARG*/") + len("/*AUTOARG*/")
         end = result.find(");", start)
-        return result[start:end]
+        region = result[start:end]
+        return "\n".join(
+            ln for ln in region.splitlines() if not ln.strip().startswith("//")
+        )
 
     def test_autoarg_regenerates_after_port_removed(self):
         """Re-running AUTOARG must drop a port that was deleted from the body."""
@@ -220,7 +224,7 @@ class TestVerilogExpander:
             assert name in args
 
     def test_autoarg_regenerates_after_port_added(self):
-        """New ports appear in declaration order, with no stale duplicate chunk."""
+        """New ports appear (grouped: outputs first, then inputs), no stale chunk."""
         project = VerilogProject()
         expander = VerilogExpander(project)
         content = """
@@ -234,7 +238,54 @@ class TestVerilogExpander:
         result = expander.expand_autoarg(content, "m.sv")
         args = self._arg_line(result)
         names = [n.strip() for n in args.split(",") if n.strip()]
-        assert names == ["clk", "rst_n", "mode", "valid", "busy"]
+        assert names == ["valid", "busy", "clk", "rst_n", "mode"]
+
+    def test_autoarg_groups_by_direction(self):
+        """Ports are listed under // Outputs / // Inouts / // Inputs headers,
+        outputs first, matching Emacs / AUTOINST grouping."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m (/*AUTOARG*/);
+            input        clk;
+            output       done;
+            inout        bus;
+        endmodule
+        """
+        result = expander.expand_autoarg(content, "m.sv")
+        assert "// Outputs" in result
+        assert "// Inouts" in result
+        assert "// Inputs" in result
+        assert (
+            result.index("// Outputs")
+            < result.index("// Inouts")
+            < result.index("// Inputs")
+        )
+        assert result.index("done") < result.index("bus") < result.index("clk")
+
+    def test_autoarg_grouped_delete_round_trip(self):
+        """Expand (producing grouped comments) then delete returns to a bare
+        tag, keeping the manual name before the tag."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m (
+            clk,
+            /*AUTOARG*/
+        );
+            input clk;
+            input rst_n;
+            output valid;
+        endmodule
+        """
+        expanded = expander.expand_autoarg(content, "m.sv")
+        assert "// Outputs" in expanded
+        deleted = expander.delete_all(expanded, "m.sv")
+        assert "// Outputs" not in deleted
+        assert "// Inputs" not in deleted
+        assert "/*AUTOARG*/" in deleted
+        header = deleted[: deleted.find(");")]
+        assert "clk" in header
 
     def test_autoarg_preserves_manual_before_tag(self):
         """A name listed before the tag stays, is not duplicated, and the

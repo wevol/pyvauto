@@ -772,7 +772,8 @@ class VerilogExpander:
     def _format_autoarg_list(self, ports_to_expand, is_ansi):
         """Render the AUTOARG port list. ANSI mode emits one full declaration
         ('direction [width] name') per line; Non-ANSI mode emits bare names
-        wrapped to 80 columns."""
+        grouped by direction under // Outputs / // Inouts / // Inputs headers,
+        wrapped to 80 columns within each group."""
         if not ports_to_expand:
             return ""
         if is_ansi:
@@ -783,9 +784,37 @@ class VerilogExpander:
             ]
             return ",\n    ".join(decls)
 
-        # Non-ANSI Mode: Names only, wrapped to 80 chars
-        names = [p.name for p in ports_to_expand]
-        return self._wrap_names(names, "    ")
+        # Non-ANSI Mode: group by direction with // headers (Emacs style),
+        # names wrapped to 80 columns within each group. Same order and header
+        # strings as AUTOINST.
+        groups = []
+        for direction, header in (
+            ("output", "    // Outputs"),
+            ("inout", "    // Inouts"),
+            ("input", "    // Inputs"),
+        ):
+            members = [p.name for p in ports_to_expand if p.direction == direction]
+            if members:
+                groups.append((header, members))
+        others = [
+            p.name
+            for p in ports_to_expand
+            if p.direction not in ("output", "inout", "input")
+        ]
+        if others:
+            groups.append((None, others))
+
+        lines = []
+        for gi, (header, names) in enumerate(groups):
+            if header:
+                lines.append(header)
+            block = self._wrap_names(names, "    ")
+            if gi != len(groups) - 1:
+                block += ","  # comma joining this group to the next
+            lines.append(block)
+        # Strip the first line's indent: the caller's f-string prepends "    "
+        # to the first line only, so every rendered line ends at 4 spaces.
+        return "\n".join(lines).lstrip()
 
     @staticmethod
     def _wrap_names(items, indent_str, limit=80):
