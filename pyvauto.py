@@ -3,7 +3,7 @@ import os
 import argparse
 import sys
 import traceback
-from typing import Optional, Dict, List, Set
+from typing import Optional, Dict, List, Set, Union
 
 
 # ============================================================================
@@ -375,25 +375,38 @@ class VerilogProject:
                 if file.endswith((".v", ".sv")) and file != "test_top.sv":
                     self._index_file(os.path.join(root, file))
 
-    def resolve(self, path: str, needed: Set[str]) -> None:
+    def resolve(self, roots: Union[str, List[str]], needed: Set[str]) -> None:
         """Index only the modules in `needed` (plus any co-located in the
-        same files), parsing as few files as possible. Module names are
-        globally unique, so first-found wins."""
+        same files), parsing as few files as possible, across one or more root
+        directories. Module names are globally unique, so first-found wins.
+        `roots` may be a single path (str) or a list of paths."""
         pending = set(needed)
         if not pending:
             return
+        if isinstance(roots, str):
+            roots = [roots]
+        # De-duplicate roots by realpath, preserving order.
+        seen = set()
+        uniq_roots = []
+        for r in roots:
+            rp = os.path.realpath(r)
+            if rp not in seen:
+                seen.add(rp)
+                uniq_roots.append(r)
 
-        # One cheap directory listing — file names only, no reads/parsing.
+        # One cheap directory listing per root — file names only, no parsing.
         candidates = []                  # all candidate .v/.sv paths
         by_basename = {}                 # '<name>' -> path, for the fast-path
-        for root, _, files in os.walk(path):
-            for file in files:
-                if file.endswith((".v", ".sv")) and file != "test_top.sv":
-                    full = os.path.join(root, file)
-                    candidates.append(full)
-                    by_basename.setdefault(os.path.splitext(file)[0], full)
+        for path in uniq_roots:
+            for root, _, files in os.walk(path):
+                for file in files:
+                    if file.endswith((".v", ".sv")) and file != "test_top.sv":
+                        full = os.path.join(root, file)
+                        candidates.append(full)
+                        by_basename.setdefault(os.path.splitext(file)[0], full)
 
-        print(f"Resolving {len(pending)} module(s) under {os.path.abspath(path)}")
+        roots_str = ", ".join(os.path.abspath(r) for r in uniq_roots)
+        print(f"Resolving {len(pending)} module(s) under {roots_str}")
         parsed = set()
 
         # B — filename fast-path: parse only '<name>.v' / '<name>.sv'.
@@ -1234,30 +1247,37 @@ def main():
             action="store_true",
             help="反展開：移除自動產生內容、只留裸 tag（不展開）",
         )
+        parser.add_argument(
+            "--incdir",
+            action="append",
+            default=[],
+            metavar="DIR",
+            help="額外搜尋子模組定義的目錄（可重複）",
+        )
         args = parser.parse_args()
 
         project = VerilogProject()
         expander = VerilogExpander(project)
-
-        # Index only the sub-modules the target files actually instantiate.
-        needed: Set[str] = set()
-        for fpath in args.files:
-            if not os.path.exists(fpath):
-                continue
-            with open(fpath, "r", encoding="utf-8", errors="ignore", newline="") as f:
-                for inst in project.parser.get_instantiations(f.read(), fpath):
-                    needed.add(inst["module_name"])
-        project.resolve(".", needed)
 
         for fpath in args.files:
             if not os.path.exists(fpath):
                 print(f"Skip: {fpath} (not found)")
                 continue
 
-            print(f"{'Deleting' if args.delete else 'Expanding'}: {fpath}")
             with open(fpath, "r", encoding="utf-8", newline="") as f:
                 content = f.read()
 
+            if not args.delete:
+                # Resolve only the sub-modules THIS file instantiates, searching
+                # the file's own directory plus any --incdir dirs.
+                needed = {
+                    inst["module_name"]
+                    for inst in project.parser.get_instantiations(content, fpath)
+                }
+                roots = [os.path.dirname(fpath) or "."] + args.incdir
+                project.resolve(roots, needed)
+
+            print(f"{'Deleting' if args.delete else 'Expanding'}: {fpath}")
             transform = expander.delete_all if args.delete else expander.expand_all
             new_content = transform(content, fpath)
 

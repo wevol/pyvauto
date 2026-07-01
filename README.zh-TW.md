@@ -10,7 +10,7 @@ Python 版本的 Verilog 自動化工具，提供類似 Emacs `verilog-mode` 的
 
 - ✅ **混合模式支援**: 所有自動化標籤皆支援與手動宣告混合並存，不會產生重複定義。
 - ✅ **AUTOINST**: 自動產生模組實例化的埠口連接（與手動連線自動去重）。
-- ✅ **AUTOARG**: 自動維護模組埠口列表，支援 **ANSI (混合模式)** 與 **Non-ANSI** 風格。
+- ✅ **AUTOARG**: 自動維護模組埠口列表，支援 **ANSI (混合模式)** 與 **Non-ANSI** 風格。Non-ANSI 清單每次執行都會重新產生，並依方向分組於 `// Outputs` / `// Inouts` / `// Inputs` 標頭之下，與 Emacs 相同。
 - ✅ **AUTOINPUT / AUTOOUTPUT**: 自動從子模組中提取並宣告未定義的輸入/輸出埠口。
 - ✅ **AUTOWIRE**: 自動建立實例化模組間互連所需的 `wire` 宣告。
 - ✅ **智慧替換**: 產生的區塊具備穩定性，重複執行不會產生冗餘標籤或語法錯誤。
@@ -61,8 +61,8 @@ python pyvauto.py <file1.sv> <file2.sv> ...
 python pyvauto.py --delete <file1.sv> ...
 ```
 
-> ⚠️ CLI 會索引**當前工作目錄 (`.`)** 來尋找模組定義，而非目標檔案所在目錄。
-> 因此 AUTOINST 等跨模組擴展，請**從含有子模組定義的專案根目錄執行**。
+> ℹ️ AUTOINST 等跨模組擴展時，CLI 會在**目標檔案所在的目錄**尋找子模組定義。
+> 若子模組在別處，用 `--incdir DIR`（可重複）加入搜尋目錄：`python pyvauto.py --incdir rtl/common top.sv`。
 
 ### 功能展示
 
@@ -86,6 +86,31 @@ module top (
     input rst_n;
     input [7:0] data_in;
     // ...
+endmodule
+```
+
+#### 3. Non-ANSI AUTOARG — Emacs 風格方向分組
+使用裸標頭 `/*AUTOARG*/` 時，埠口名稱列表每次執行都會重新產生，並依方向分組。手動埠口請放在標籤**之前**；標籤之後的內容全由工具自動維護（刪掉的埠口會消失、新增的埠口會落到對應分組）。以下：
+```systemverilog
+module m (/*AUTOARG*/);
+    input  clk, rst_n;
+    output valid;
+    inout  bus;
+endmodule
+```
+會展開成：
+```systemverilog
+module m (/*AUTOARG*/
+    // Outputs
+    valid,
+    // Inouts
+    bus,
+    // Inputs
+    clk, rst_n
+);
+    input  clk, rst_n;
+    output valid;
+    inout  bus;
 endmodule
 ```
 

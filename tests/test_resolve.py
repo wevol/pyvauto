@@ -113,3 +113,64 @@ def test_cli_resolves_submodule_from_sibling_file(tmp_path):
         expanded = f.read()
     assert ".clk" in expanded and ".done" in expanded   # AUTOINST filled in
     assert "unused" not in result.stdout                  # decoy not parsed
+
+
+def test_resolve_searches_multiple_roots(tmp_path):
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    c = tmp_path / "c"
+    for d in (a, b, c):
+        d.mkdir()
+    _write(b, "sub.v", "module sub(input clk); endmodule\n")
+    _write(c, "decoy.v", "module decoy(input x); endmodule\n")
+
+    project = VerilogProject()
+    project.resolve([str(a), str(b)], {"sub"})
+
+    assert "sub" in project.modules
+    assert "decoy" not in project.modules  # c not among the roots
+
+
+def test_cli_resolves_submodule_from_file_directory_outside_cwd(tmp_path):
+    proj = tmp_path / "proj"
+    other = tmp_path / "other"
+    proj.mkdir()
+    other.mkdir()
+    _write(proj, "sub.v", "module sub(input clk, output done); endmodule\n")
+    top = _write(proj, "top.sv", "module top;\n  sub u (/*AUTOINST*/);\nendmodule\n")
+
+    result = subprocess.run(
+        [sys.executable, PYVAUTO, str(top)],
+        cwd=str(other),
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    with open(top, encoding="utf-8") as f:
+        expanded = f.read()
+    assert ".clk" in expanded and ".done" in expanded
+
+
+def test_cli_incdir_finds_submodule(tmp_path):
+    proj = tmp_path / "proj"
+    lib = tmp_path / "lib"
+    other = tmp_path / "other"
+    for d in (proj, lib, other):
+        d.mkdir()
+    _write(lib, "sub.v", "module sub(input clk, output done); endmodule\n")
+    top = _write(proj, "top.sv", "module top;\n  sub u (/*AUTOINST*/);\nendmodule\n")
+
+    subprocess.run(
+        [sys.executable, PYVAUTO, str(top)],
+        cwd=str(other), capture_output=True, text=True,
+    )
+    with open(top, encoding="utf-8") as f:
+        assert ".clk" not in f.read()
+
+    result = subprocess.run(
+        [sys.executable, PYVAUTO, "--incdir", str(lib), str(top)],
+        cwd=str(other), capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    with open(top, encoding="utf-8") as f:
+        assert ".clk" in f.read()

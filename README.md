@@ -10,7 +10,7 @@ A Python Verilog automation tool that brings Emacs `verilog-mode`-style AUTO exp
 
 - ✅ **Mixed-mode support**: every AUTO tag coexists with manual declarations — no duplicate definitions.
 - ✅ **AUTOINST**: auto-generates instance port connections (manual connections are detected and de-duplicated).
-- ✅ **AUTOARG**: maintains the module port list in both **ANSI (mixed-mode)** and **Non-ANSI** styles.
+- ✅ **AUTOARG**: maintains the module port list in both **ANSI (mixed-mode)** and **Non-ANSI** styles. The Non-ANSI list is regenerated on every run and grouped by direction under `// Outputs` / `// Inouts` / `// Inputs` headers, just like Emacs.
 - ✅ **AUTOINPUT / AUTOOUTPUT**: pulls undeclared input/output ports up from sub-instances and declares them.
 - ✅ **AUTOWIRE**: declares the `wire`s needed to interconnect instantiated modules.
 - ✅ **Stable replacement (idempotent)**: generated blocks are detected and replaced, so re-running never accumulates redundant tags or breaks syntax.
@@ -59,8 +59,8 @@ python pyvauto.py <file1.sv> <file2.sv> ...
 python pyvauto.py --delete <file1.sv> ...
 ```
 
-> ⚠️ The CLI indexes the **current working directory (`.`)** to find module definitions, not the target file's directory.
-> So for cross-module expansions like AUTOINST, **run it from the project root that contains the sub-module definitions**.
+> ℹ️ For cross-module expansions like AUTOINST, the CLI searches the **target file's own directory** for sub-module definitions.
+> If a sub-module lives elsewhere, add its directory with `--incdir DIR` (repeatable): `python pyvauto.py --incdir rtl/common top.sv`.
 
 ### Examples
 
@@ -84,6 +84,31 @@ module top (
     input rst_n;
     input [7:0] data_in;
     // ...
+endmodule
+```
+
+#### 3. Non-ANSI AUTOARG — Emacs-style direction grouping
+With a bare `/*AUTOARG*/` header, the port-name list is regenerated on every run and grouped by direction. Put any manual ports **before** the tag; everything after it is auto-managed (removed ports drop out, added ports land in the right group). This:
+```systemverilog
+module m (/*AUTOARG*/);
+    input  clk, rst_n;
+    output valid;
+    inout  bus;
+endmodule
+```
+expands to:
+```systemverilog
+module m (/*AUTOARG*/
+    // Outputs
+    valid,
+    // Inouts
+    bus,
+    // Inputs
+    clk, rst_n
+);
+    input  clk, rst_n;
+    output valid;
+    inout  bus;
 endmodule
 ```
 
