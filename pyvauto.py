@@ -705,12 +705,19 @@ class VerilogExpander:
                 + content[match.end() :]
             )
 
-        # Detect ANSI mode: if the port block already contains direction keywords
-        # Scan entire port_block for existing ports
-        is_ansi = bool(re.search(r"\b(input|output|inout)\b", port_block))
+        # Emacs model: manual args live BEFORE the tag and are preserved; the
+        # region AFTER the tag is stale auto output and is regenerated from the
+        # module's current ports on every run (so removed ports disappear and
+        # added ports show up in declaration order).
+        tag_index = port_block.find(autoarg_tag)
+        before_tag = port_block[:tag_index].strip()  # manual; after_tag discarded
 
-        # Identify existing header ports, then expand the rest.
-        existing_ports = self._collect_header_ports(port_block, autoarg_tag, is_ansi)
+        # Detect ANSI from the manual region only (empty -> bare names, the
+        # common case and Emacs' behavior).
+        is_ansi = bool(re.search(r"\b(input|output|inout)\b", before_tag))
+
+        # Manual ports before the tag are preserved and not duplicated.
+        existing_ports = self._collect_header_ports(before_tag, autoarg_tag, is_ansi)
 
         # Validation of manual ports in header
         for p_name in existing_ports:
@@ -721,19 +728,15 @@ class VerilogExpander:
 
         ports_to_expand = [p for p in module.ports if p.name not in existing_ports]
         arg_list = self._format_autoarg_list(ports_to_expand, is_ansi)
+        arg_list = self._apply_comma_context(arg_list, before_tag, "")
 
-        tag_index = port_block.find(autoarg_tag)
-        before_tag = port_block[:tag_index].strip()
-        after_tag = port_block[tag_index + len(autoarg_tag) :].strip()
-        arg_list = self._apply_comma_context(arg_list, before_tag, after_tag)
-
-        # Construct replacement: just the tag + new content, no block markers
         if arg_list.strip():
-            replacement_block = f"/*AUTOARG*/\n    {arg_list}"
+            tag_with_args = f"/*AUTOARG*/\n    {arg_list}"
         else:
-            replacement_block = "/*AUTOARG*/"
+            tag_with_args = "/*AUTOARG*/"
 
-        new_port_block = port_block.replace(autoarg_tag, replacement_block)
+        # Rebuild: manual-before-tag + tag + regenerated args.
+        new_port_block = (before_tag + " " if before_tag else "") + tag_with_args
         # Clean up trailing comma
         new_port_block = re.sub(r",(\s*)$", r"\1", new_port_block)
 

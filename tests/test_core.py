@@ -195,6 +195,82 @@ class TestVerilogExpander:
 
         assert "logic [15:0] my_logic_sig;" in result
 
+    def _arg_line(self, result):
+        """Return the AUTOARG name list (text between the tag and ');')."""
+        start = result.find("/*AUTOARG*/") + len("/*AUTOARG*/")
+        end = result.find(");", start)
+        return result[start:end]
+
+    def test_autoarg_regenerates_after_port_removed(self):
+        """Re-running AUTOARG must drop a port that was deleted from the body."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m (/*AUTOARG*/
+                clk, rst_n, en, valid
+        );
+            input        clk, rst_n;
+            output       valid;
+        endmodule
+        """
+        result = expander.expand_autoarg(content, "m.sv")
+        args = self._arg_line(result)
+        assert "en" not in args
+        for name in ("clk", "rst_n", "valid"):
+            assert name in args
+
+    def test_autoarg_regenerates_after_port_added(self):
+        """New ports appear in declaration order, with no stale duplicate chunk."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m (/*AUTOARG*/
+                clk, valid
+        );
+            input        clk, rst_n, mode;
+            output       valid, busy;
+        endmodule
+        """
+        result = expander.expand_autoarg(content, "m.sv")
+        args = self._arg_line(result)
+        names = [n.strip() for n in args.split(",") if n.strip()]
+        assert names == ["clk", "rst_n", "mode", "valid", "busy"]
+
+    def test_autoarg_preserves_manual_before_tag(self):
+        """A name listed before the tag stays, is not duplicated, and the
+        auto region regenerates the rest."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m (
+            clk,
+            /*AUTOARG*/
+        );
+            input clk;
+            input rst_n;
+            output [7:0] data_out;
+        endmodule
+        """
+        result = expander.expand_autoarg(content, "m.sv")
+        header = result[: result.find(");")]
+        assert header.count("clk") == 1
+        for name in ("rst_n", "data_out"):
+            assert name in header
+
+    def test_autoarg_regeneration_is_idempotent(self):
+        """Two consecutive expands with unchanged ports produce identical text."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m (/*AUTOARG*/);
+            input        clk, rst_n;
+            output       valid;
+        endmodule
+        """
+        once = expander.expand_autoarg(content, "m.sv")
+        twice = expander.expand_autoarg(once, "m.sv")
+        assert once == twice
+
 
 class TestBugFixes:
     """回歸測試：確保已修復的邏輯錯誤不再復現"""
