@@ -12,5 +12,20 @@ for in in "$here/inputs"/*.sv; do
   cp "$work/$name.sv" "$here/golden/$name.golden"
   rm -rf "$work"
 done
+
+# Full corpus: the real tests/*.sv fixtures. Some reference sub-modules in
+# OTHER fixtures, so run Python with the whole corpus present.
+corpus="$(mktemp -d)"
+cp "$repo/tests"/*.sv "$corpus"/
+for f in "$corpus"/*.sv; do
+  name="$(basename "$f" .sv)"
+  ( cd "$corpus" && python3 "$repo/pyvauto.py" "$name.sv" >/dev/null 2>&1 )
+done
+for f in "$repo/tests"/*.sv; do
+  name="$(basename "$f" .sv)"
+  cp "$corpus/$name.sv" "$here/golden/tests_$name.golden"
+done
+rm -rf "$corpus"
+
 echo "goldens regenerated:"
 ls -1 "$here/golden"

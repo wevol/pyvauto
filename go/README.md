@@ -1,9 +1,9 @@
-# pyvauto (Go MVP)
+# pyvauto (Go)
 
-A standalone Go port of `pyvauto` — no Python runtime needed for the expand
-path. This is an **MVP**: it implements the CLI, parser, `AUTOINST`, and
-`AUTOARG`, with output verified byte-for-byte against the Python `pyvauto.py`
-via golden tests. Everything else is still Python-only (see Scope).
+A standalone Go port of `pyvauto` — no Python runtime needed. It implements the
+full CLI, parser, every AUTO tag, and `--delete`, with output verified
+byte-for-byte against the Python `pyvauto.py` via golden tests over the real
+`tests/*.sv` corpus.
 
 ## Build
 
@@ -26,19 +26,17 @@ GOOS=windows GOARCH=amd64 go build -o pyvauto-windows-amd64.exe ./cmd/pyvauto
 pyvauto [--incdir DIR]... <file.sv> [file2.sv ...]
 ```
 
-- Expands `AUTOINST` and `AUTOARG` in place (writes only when content changes).
+- Expands every AUTO tag in place (writes only when content changes).
+- `--delete` un-expands (strips auto-generated content, leaves the bare tags).
 - Sub-modules are searched in each target file's own directory plus any
   `--incdir` directories.
-- `--delete` is **not implemented** in the MVP and exits with an error.
 
-## Scope (MVP)
+## Scope
 
-- **In:** CLI, parser, `AUTOINST` (fill a bare tag: group by direction, widths,
-  keep manual connections before the tag), `AUTOARG` (Emacs-style regeneration +
-  direction grouping).
-- **Out (still use the Python `pyvauto.py`):** `AUTOWIRE`, `AUTOLOGIC`,
-  `AUTOINPUT`, `AUTOOUTPUT`, `AUTOSENSE`, `--delete`, AUTOINST width-mismatch
-  warnings, and AUTOINST advanced reconcile (re-run add/remove, width refresh).
+Full parity with `pyvauto.py`: `AUTOINST` (incl. reconcile + width-mismatch
+warnings), `AUTOARG`, `AUTOINPUT`, `AUTOOUTPUT`, `AUTOWIRE`, `AUTOLOGIC`,
+`AUTOSENSE`, and `--delete` — all matched byte-for-byte against the Python
+oracle on the `tests/*.sv` corpus.
 
 ## Vim plugin
 
@@ -49,8 +47,8 @@ The bundled Vim plugin can call this binary for the expand path — set
 let g:pyvauto_bin = '/path/to/go/pyvauto'
 ```
 
-`:Pyvauto` / `:VA` then run the binary directly (no Python). `:NVA`
-(un-expand) still uses Python, since the Go MVP has no delete.
+`:Pyvauto` / `:VA` (expand) and `:NVA` (un-expand) then run the binary
+directly — no Python needed.
 
 ## Tests
 

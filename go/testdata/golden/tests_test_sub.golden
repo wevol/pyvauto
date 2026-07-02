@@ -1,0 +1,38 @@
+module sub_module #(
+    parameter WIDTH = 8
+) (data_i, data_i2, data_o /*AUTOARG*/
+    , // Inputs
+    clk, rst_n
+);
+ input clk;
+ input rst_n;
+    /*autoinput*/
+    input [WIDTH-1:0] data_i;//test comment
+    input [4:1] data_i2;//test comment2
+    /*autooutput*/
+    output [WIDTH-1:0] data_o;
+    /*autowire*/
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            data_o <= 0;
+        end else begin
+            data_o <= data_i;
+        end
+    end
+
+    always@(/*AUTOSENSE*/data_i or data_i2) begin
+       case(data_i2) 
+          4'b1: data_o <= data_i + 1;
+          4'b10: data_o <= data_i + 2;
+          4'b11: data_o <= data_i + 3;
+          4'b100: data_o <= data_i + 4;
+          4'b101: data_o <= data_i + 5;
+          4'b110: data_o <= data_i + 6;
+          4'b111: data_o <= data_i + 7;
+          default: data_o <= data_i;
+       endcase
+
+    end
+
+endmodule
