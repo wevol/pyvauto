@@ -71,6 +71,7 @@ func TestAutooutputAnsiGolden(t *testing.T) { expandGolden(t, "autooutput_ansi")
 func TestAutoinputConstGolden(t *testing.T) { expandGolden(t, "autoinput_const") }
 func TestAutowireGolden(t *testing.T)       { expandGolden(t, "autowire_basic") }
 func TestAutologicMixedGolden(t *testing.T) { expandGolden(t, "autologic_mixed") }
+func TestAutosenseGolden(t *testing.T)      { expandGolden(t, "autosense_comb") }
 
 func TestExpandAllIdempotent(t *testing.T) {
 	for _, name := range []string{"autowire_basic", "autologic_mixed", "autoinput_body"} {
