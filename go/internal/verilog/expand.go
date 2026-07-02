@@ -203,3 +203,135 @@ func ExpandAutoarg(content, filePath string, proj *Project) string {
 	replacement := header + " (" + pyRStrip(newPortBlock) + "\n);"
 	return content[:loc[0]] + replacement + content[loc[1]:]
 }
+
+var autoinstRe = regexp.MustCompile(`(?is)(\w+)\s+(\w+)\s*(#\s*\(.*?\))?\s*\(([^;]*?(/\*AUTOINST\*/)[^;]*?)\)\s*;`)
+var doubleCommaRe = regexp.MustCompile(`,(\s*),`)
+var reconcileSignalRe = regexp.MustCompile(`^\s*(\w+)\s*(\[[^\]]*\])?\s*$`)
+
+// reconcileSignal ports _reconcile_signal: reuse a simple identifier's base and
+// refresh its width; leave complex expressions verbatim.
+func reconcileSignal(existing, width string) string {
+	m := reconcileSignalRe.FindStringSubmatch(existing)
+	if m == nil {
+		return existing
+	}
+	return m[1] + width
+}
+
+// buildAutoinstPortLines ports _build_autoinst_port_lines (MVP: no width-mismatch
+// warning comments — those are out of the Go MVP scope).
+func buildAutoinstPortLines(ports []Port, afterConns map[string]string) string {
+	var lines []string
+	formatP := func(p Port) string {
+		var signal string
+		if ex, ok := afterConns[p.Name]; ok {
+			signal = reconcileSignal(ex, p.Width)
+		} else {
+			signal = p.Name + p.Width
+		}
+		return "    ." + p.Name + " (" + signal + ")"
+	}
+	for _, dh := range []struct{ dir, header string }{
+		{"output", "    // Outputs"},
+		{"inout", "    // Inouts"},
+		{"input", "    // Inputs"},
+	} {
+		var members []Port
+		for _, p := range ports {
+			if p.Direction == dh.dir {
+				members = append(members, p)
+			}
+		}
+		if len(members) > 0 {
+			lines = append(lines, dh.header)
+			for _, p := range members {
+				lines = append(lines, formatP(p))
+			}
+		}
+	}
+	for _, p := range ports {
+		if p.Direction != "output" && p.Direction != "inout" && p.Direction != "input" {
+			lines = append(lines, formatP(p))
+		}
+	}
+	var portIdx []int
+	for i, l := range lines {
+		if strings.HasPrefix(pyStrip(l), ".") {
+			portIdx = append(portIdx, i)
+		}
+	}
+	for k := 0; k+1 < len(portIdx); k++ {
+		lines[portIdx[k]] += ","
+	}
+	return strings.Join(lines, "\n")
+}
+
+// ExpandAutoinst ports expand_autoinst (MVP: reconcile against module ports;
+// module definitions come from the project index).
+func ExpandAutoinst(content, filePath string, proj *Project) string {
+	locs := autoinstRe.FindAllStringSubmatchIndex(content, -1)
+	if locs == nil {
+		return content
+	}
+	var b strings.Builder
+	last := 0
+	for _, loc := range locs {
+		b.WriteString(content[last:loc[0]])
+		b.WriteString(autoinstReplace(content, loc, proj))
+		last = loc[1]
+	}
+	b.WriteString(content[last:])
+	return b.String()
+}
+
+func autoinstReplace(content string, loc []int, proj *Project) string {
+	full := content[loc[0]:loc[1]]
+	modName := content[loc[2]:loc[3]]
+	instName := content[loc[4]:loc[5]]
+	param := ""
+	if loc[6] >= 0 {
+		param = content[loc[6]:loc[7]]
+	}
+	portBlock := content[loc[8]:loc[9]]
+	tag := content[loc[10]:loc[11]]
+
+	if instSkipKeywords[modName] {
+		return full
+	}
+	module := proj.Modules[modName]
+	if module == nil {
+		return full
+	}
+
+	tagIndex := strings.Index(portBlock, tag)
+	beforeTag := portBlock[:tagIndex]
+	afterTag := portBlock[tagIndex+len(tag):]
+
+	beforeConns := ParseNamedPortConnections(StripComments(beforeTag))
+	afterConns := ParseNamedPortConnections(StripComments(afterTag))
+	claimed := map[string]bool{}
+	for k := range beforeConns {
+		claimed[k] = true
+	}
+
+	var portsToEmit []Port
+	for _, p := range module.Ports {
+		if !claimed[p.Name] {
+			portsToEmit = append(portsToEmit, p)
+		}
+	}
+	portStr := buildAutoinstPortLines(portsToEmit, afterConns)
+
+	beforeStripped := pyStrip(beforeTag)
+	var newPortBlock string
+	if pyStrip(portStr) != "" {
+		portStr = applyCommaContext(portStr, beforeStripped, "")
+		newPortBlock = beforeTag + "/*AUTOINST*/\n" + portStr
+	} else {
+		newPortBlock = beforeTag + "/*AUTOINST*/"
+	}
+	newPortBlock = trailingCommaRe.ReplaceAllString(newPortBlock, "$1")
+	newPortBlock = doubleCommaRe.ReplaceAllString(newPortBlock, ",$1")
+
+	return modName + " " + instName + " " + param + " (" + newPortBlock + "\n    );"
+}

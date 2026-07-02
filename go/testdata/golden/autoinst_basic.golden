@@ -1,0 +1,14 @@
+module sub (input clk, input rst_n, input [7:0] data_i, output [7:0] data_o);
+endmodule
+
+module top;
+    sub u_sub  (
+        .clk(my_clk),
+        /*AUTOINST*/
+    // Outputs
+    .data_o (data_o[7:0]),
+    // Inputs
+    .rst_n (rst_n),
+    .data_i (data_i[7:0])
+    );
+endmodule
