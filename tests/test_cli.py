@@ -1,8 +1,9 @@
 """
-CLI 進入點測試 - 以 subprocess 實際執行 `python pyvauto.py <file>`。
+CLI entry-point tests — actually run `python pyvauto.py <file>` via subprocess.
 
-驗證 main() 的就地展開、多檔處理、找不到檔案時的 Skip 訊息與冪等性。
-這些路徑（argparse、掃描 cwd、寫回檔案）過去只有手動驗證，未進 CI。
+Verify main()'s in-place expansion, multi-file handling, the Skip message for a
+missing file, and idempotency. These paths (argparse, directory scanning,
+writing files back) used to be verified only by hand, not in CI.
 """
 
 import subprocess
@@ -17,7 +18,7 @@ TOP = "module top;\n    sub u_sub (\n        /*AUTOINST*/\n    );\nendmodule\n"
 
 
 def _run(args, cwd):
-    """以 cwd 執行 pyvauto.py（CLI 會索引 cwd 找模組定義）。"""
+    """Run pyvauto.py with the given cwd (the target file's directory is searched for module definitions)."""
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
         cwd=str(cwd),
@@ -52,10 +53,10 @@ def test_cli_delete_reverses_expansion(tmp_path):
     top = tmp_path / "top.sv"
     top.write_text(TOP)
 
-    _run(["top.sv"], tmp_path)  # 先展開
+    _run(["top.sv"], tmp_path)  # expand first
     assert ".clk" in top.read_text()
 
-    r = _run(["--delete", "top.sv"], tmp_path)  # 反展開
+    r = _run(["--delete", "top.sv"], tmp_path)  # un-expand
 
     assert r.returncode == 0, r.stderr
     out = top.read_text()

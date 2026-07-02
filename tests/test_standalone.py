@@ -1,8 +1,8 @@
 """
-測試單一檔案執行 - 驗證 pyvauto.py 無需外部模組即可運作
+Standalone execution test — verify pyvauto.py works without any external module.
 
-這個測試會失敗 (RED)，因為目前 pyvauto.py 依賴 parser.py。
-當我們完成合併後，這個測試應該會通過 (GREEN)。
+This test would fail (RED) while pyvauto.py still depended on parser.py.
+Once the merge was done, it passes (GREEN).
 """
 
 import sys
@@ -13,39 +13,39 @@ import importlib.util
 
 def test_pyvauto_is_standalone():
     """
-    測試 pyvauto.py 可以單獨運作，不依賴 parser.py
+    pyvauto.py must work on its own, without depending on parser.py.
 
-    這個測試目前應該失敗 (RED)，因為 pyvauto.py
-    在第 8 行: from parser import VerilogModule, RegexVerilogParser
+    This test would fail (RED) while pyvauto.py had, at line 8:
+    from parser import VerilogModule, RegexVerilogParser
     """
     project_root = Path(__file__).parent.parent
     pyvauto_path = project_root / "pyvauto.py"
 
-    # 讀取 pyvauto.py 的內容
+    # Read pyvauto.py's content
     with open(pyvauto_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 驗證：不應該有 "from parser import" 這樣的語句
+    # Verify: there must be no "from parser import" statement
     assert "from parser import" not in content, (
-        "pyvauto.py 仍然依賴 parser.py。"
-        "這個測試預期會失敗 (RED)，直到我們完成合併。"
+        "pyvauto.py still depends on parser.py. "
+        "This test is expected to fail (RED) until the merge is done."
     )
 
-    # 進一步驗證：所有必要的類別都應該在 pyvauto.py 內部定義
+    # Further: all required classes must be defined inside pyvauto.py
     assert "class VerilogPort:" in content, (
-        "VerilogPort 類別應該在 pyvauto.py 中定義"
+        "VerilogPort class should be defined in pyvauto.py"
     )
     assert "class VerilogModule:" in content, (
-        "VerilogModule 類別應該在 pyvauto.py 中定義"
+        "VerilogModule class should be defined in pyvauto.py"
     )
     assert "class RegexVerilogParser:" in content, (
-        "RegexVerilogParser 類別應該在 pyvauto.py 中定義"
+        "RegexVerilogParser class should be defined in pyvauto.py"
     )
 
 
 def test_pyvauto_imports_only_stdlib():
     """
-    測試 pyvauto.py 只使用標準庫
+    pyvauto.py must import only the standard library.
     """
     project_root = Path(__file__).parent.parent
     pyvauto_path = project_root / "pyvauto.py"
@@ -53,10 +53,10 @@ def test_pyvauto_imports_only_stdlib():
     with open(pyvauto_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 標準庫模組列表
+    # Standard-library module allow-list
     stdlib_modules = {"re", "os", "sys", "argparse", "traceback", "typing"}
 
-    # 提取所有 import 語句
+    # Extract all import statements
     import_lines = [
         line.strip()
         for line in content.split("\n")
@@ -64,17 +64,17 @@ def test_pyvauto_imports_only_stdlib():
     ]
 
     for line in import_lines:
-        # 跳過註解
+        # Skip trailing comments
         if "#" in line:
             line = line.split("#")[0].strip()
 
-        # 解析 "import xxx" 或 "from xxx import ..."
+        # Parse "import xxx" or "from xxx import ..."
         if line.startswith("from "):
             module = line.split()[1]
         else:
             module = line.split()[1].split(".")[0]
 
-        # 驗證只使用標準庫或內建型別
+        # Verify only stdlib or builtins are used
         assert module in stdlib_modules or module.startswith("__"), (
-            f"發現非標準庫引用: {module}。pyvauto.py 應該只使用標準庫。"
+            f"Found a non-stdlib import: {module}. pyvauto.py should use only the standard library."
         )

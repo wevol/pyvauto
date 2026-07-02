@@ -167,12 +167,12 @@ def _widths_mismatch(w1: str, w2: str) -> bool:
 
 
 # ============================================================================
-# Verilog 解析器類別 (原 parser.py 的內容)
+# Verilog parser classes (formerly parser.py)
 # ============================================================================
 
 
 class VerilogPort:
-    """Verilog 埠口定義"""
+    """A Verilog port definition."""
 
     def __init__(
         self, name: str, direction: str, width: str = "", port_type: str = "wire"
@@ -184,7 +184,7 @@ class VerilogPort:
 
 
 class VerilogModule:
-    """Verilog 模組定義"""
+    """A Verilog module definition."""
 
     def __init__(
         self,
@@ -200,7 +200,7 @@ class VerilogModule:
 
 
 class RegexVerilogParser:
-    """基於正則表達式的 Verilog 解析器"""
+    """Regex-based Verilog parser."""
 
     def __init__(self):
         self.module_re = re.compile(
@@ -225,7 +225,7 @@ class RegexVerilogParser:
         return [n.strip() for n in name_group.split(",")]
 
     def parse_file(self, content: str, file_path: str = "") -> List:
-        """解析 Verilog 檔案內容並返回模組列表"""
+        """Parse Verilog file content and return the list of modules."""
         modules = []
         content_no_comments = strip_comments_safely(content)
 
@@ -283,7 +283,7 @@ class RegexVerilogParser:
         return modules
 
     def get_instantiations(self, content: str, file_path: str) -> List:
-        """提取 Verilog 實例化資訊"""
+        """Extract Verilog instantiation info."""
         content_no_comments = strip_comments_safely(content)
 
         inst_pattern = re.compile(
@@ -305,7 +305,7 @@ class RegexVerilogParser:
         return insts
 
     def get_local_signals(self, content: str, file_path: str) -> Set:
-        """提取區域訊號定義（含 ports、parameters、wire/reg/logic 宣告）"""
+        """Extract local signal definitions (ports, parameters, wire/reg/logic declarations)."""
         content_no_comments = strip_comments_safely(content)
         signals: Set[str] = set()
 
@@ -326,7 +326,7 @@ class RegexVerilogParser:
         return signals
 
     def get_local_signal_widths(self, content: str, file_path: str) -> Dict[str, str]:
-        """提取區域訊號與其位寬對映（找不到或無位寬則為空字串）"""
+        """Extract local signals mapped to their bit widths (empty string when absent or scalar)."""
         widths: Dict[str, str] = {}
         content_no_comments = strip_comments_safely(content)
 
@@ -341,7 +341,7 @@ class RegexVerilogParser:
 
 
 # ============================================================================
-# Verilog 專案與擴展器類別
+# Verilog project and expander classes
 # ============================================================================
 
 
@@ -852,7 +852,7 @@ class VerilogExpander:
     def _expand_auto_signals(
         self, content: str, file_path: str, tag_name: str, signal_type: str
     ) -> str:
-        """通用函數：擴展 AUTOWIRE 或 AUTOLOGIC"""
+        """Shared helper: expand AUTOWIRE or AUTOLOGIC."""
         tag_regex = rf"(/\*{tag_name}\*/)"
         regex = re.compile(
             tag_regex + r"(\s*// Beginning.*?// End of automatics)?",
@@ -877,7 +877,7 @@ class VerilogExpander:
         if not new_signals:
             return self._splice(content, match, tag)
 
-        # 格式化輸出
+        # Format the output
         signals_str = "\n    ".join(new_signals)
         comment_type = "wires" if signal_type == "wire" else "logic"
         replacement = (
@@ -888,11 +888,11 @@ class VerilogExpander:
         return self._splice(content, match, replacement)
 
     def expand_autowire(self, content: str, file_path: str) -> str:
-        """擴展 /*AUTOWIRE*/"""
+        """Expand /*AUTOWIRE*/."""
         return self._expand_auto_signals(content, file_path, "AUTOWIRE", "wire")
 
     def expand_autologic(self, content: str, file_path: str) -> str:
-        """擴展 /*AUTOLOGIC*/"""
+        """Expand /*AUTOLOGIC*/."""
         return self._expand_auto_signals(content, file_path, "AUTOLOGIC", "logic")
 
     def _collect_auto_decls(
@@ -1022,11 +1022,11 @@ class VerilogExpander:
         return self._splice(content, match, replacement)
 
     def expand_autoinput(self, content: str, file_path: str) -> str:
-        """擴展 /*AUTOINPUT*/"""
+        """Expand /*AUTOINPUT*/."""
         return self._expand_auto_port(content, file_path, "AUTOINPUT", "input")
 
     def expand_autooutput(self, content: str, file_path: str) -> str:
-        """擴展 /*AUTOOUTPUT*/"""
+        """Expand /*AUTOOUTPUT*/."""
         return self._expand_auto_port(content, file_path, "AUTOOUTPUT", "output")
 
     def expand_autosense(self, content: str, file_path: str) -> str:
@@ -1162,7 +1162,7 @@ class VerilogExpander:
         return self._per_module_block(content, file_path, self.expand_module_block)
 
     def delete_all(self, content: str, file_path: str = "") -> str:
-        """反展開：對每個 module block 移除自動產生內容，只留裸 tag。"""
+        """Un-expand: for each module block, remove auto-generated content, leaving the bare tags."""
         return self._per_module_block(content, file_path, self.delete_module_block)
 
     def delete_module_block(self, content: str, file_path: str) -> str:
@@ -1195,7 +1195,7 @@ class VerilogExpander:
             tag = match.group(5)
             tag_end = port_block.find(tag) + len(tag)
             after = port_block[tag_end:]
-            # 丟棄 tag 後的自動連線，只保留 ')' 那一行的縮排（最後一個換行起）
+            # Drop the auto content after the tag, keeping only the ')' line's indentation (from the last newline).
             trailing = after[after.rfind("\n") :] if "\n" in after else ""
             new_block = port_block[:tag_end] + trailing
             return match.group(0).replace(port_block, new_block, 1)
@@ -1246,14 +1246,14 @@ def main():
             "--delete",
             "-k",
             action="store_true",
-            help="反展開：移除自動產生內容、只留裸 tag（不展開）",
+            help="Un-expand: strip auto-generated content, leaving only the bare tags (no expansion).",
         )
         parser.add_argument(
             "--incdir",
             action="append",
             default=[],
             metavar="DIR",
-            help="額外搜尋子模組定義的目錄（可重複）",
+            help="Extra directory to search for sub-module definitions (repeatable).",
         )
         args = parser.parse_args()
 

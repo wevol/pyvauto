@@ -1,11 +1,13 @@
 """
-Vim 插件整合測試 - 以 headless vim 實際驅動 plugin/pyvauto.vim。
+Vim plugin integration tests — drive plugin/pyvauto.vim with headless vim.
 
-自動化先前只能手動跑的端到端流程，並把插件的關鍵約定鎖進 CI：
-預設 g:pyvauto_script 指向真正的 pyvauto.py、:Pyvauto 命令存在、
-\va 有綁定，以及在 vim 內按下擴展後檔案確實被就地展開。
+Automates the end-to-end flow that previously could only be run by hand, and
+locks the plugin's key contracts into CI: the default g:pyvauto_script points at
+the real pyvauto.py, the :Pyvauto command exists, \va is bound, and pressing
+expand inside vim actually expands the file in place.
 
-若環境沒有 vim（例如某些 CI），整個模組會 skip，不會誤紅。
+If vim is unavailable (e.g. on some CI), the whole module is skipped rather than
+failing.
 """
 
 import shutil
@@ -34,7 +36,7 @@ def _run_vim(script_path):
 
 
 def test_plugin_defaults_and_mappings(tmp_path):
-    """預設腳本路徑解析到存在的 pyvauto.py，:Pyvauto 與 \\va 都就緒。"""
+    """The default script path resolves to a real pyvauto.py; :Pyvauto and \\va are ready."""
     result = tmp_path / "result.txt"
     script = tmp_path / "check.vim"
     script.write_text(
@@ -55,7 +57,7 @@ def test_plugin_defaults_and_mappings(tmp_path):
 
 
 def test_plugin_end_to_end_expansion(tmp_path):
-    """在 vim 內開檔 → :Pyvauto → 檔案被就地展開（完整端到端）。"""
+    """Open a file in vim -> :Pyvauto -> the file is expanded in place (full end-to-end)."""
     (tmp_path / "sub.sv").write_text(SUB)
     top = tmp_path / "top.sv"
     top.write_text(TOP)
@@ -75,7 +77,7 @@ def test_plugin_end_to_end_expansion(tmp_path):
 
 
 def test_plugin_delete_command_and_mappings(tmp_path):
-    """:NVA 命令存在，\\nva 與 <F6> 都綁定到 :NVA。"""
+    """The :NVA command exists; \\nva and <F6> are both bound to :NVA."""
     result = tmp_path / "result.txt"
     script = tmp_path / "check.vim"
     script.write_text(
@@ -96,7 +98,7 @@ def test_plugin_delete_command_and_mappings(tmp_path):
 
 
 def test_plugin_end_to_end_delete(tmp_path):
-    """在 vim 內 :Pyvauto 展開後 → :NVA 反展開 → 自動連線消失、tag 還在。"""
+    """After :Pyvauto expands inside vim -> :NVA un-expands -> auto connections gone, tag remains."""
     (tmp_path / "sub.sv").write_text(SUB)
     top = tmp_path / "top.sv"
     top.write_text(TOP)
