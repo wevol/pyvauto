@@ -3,8 +3,21 @@ package verilog
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestExpandAllPerModuleBlock(t *testing.T) {
+	src := "module a (/*AUTOARG*/);\n input x;\n output y;\nendmodule\n\n" +
+		"module b (/*AUTOARG*/);\n input p;\n output q;\nendmodule\n"
+	got := ExpandAll(src, "m.sv", NewProject())
+	if n := strings.Count(got, "// Inputs"); n != 2 {
+		t.Fatalf("expected both modules expanded (2 // Inputs), got %d:\n%s", n, got)
+	}
+	if !strings.Contains(got, "x") || !strings.Contains(got, "q") {
+		t.Fatalf("ports missing:\n%s", got)
+	}
+}
 
 func runGolden(t *testing.T, name string, expand func(string, string, *Project) string) {
 	t.Helper()

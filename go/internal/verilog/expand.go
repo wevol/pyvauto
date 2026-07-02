@@ -6,12 +6,23 @@ import (
 	"unicode"
 )
 
-// ExpandAll applies the MVP expanders (AUTOINST then AUTOARG) in the same
-// relative order as pyvauto.py's expand_all.
+// moduleBlockRe ports _MODULE_BLOCK_RE.
+var moduleBlockRe = regexp.MustCompile(`(?ims)^[\t ]*module\s+\w+.*?\bendmodule\b`)
+
+// perModuleBlock applies fn to each module…endmodule block (ports
+// _per_module_block).
+func perModuleBlock(content string, fn func(string) string) string {
+	return moduleBlockRe.ReplaceAllStringFunc(content, fn)
+}
+
+// ExpandAll applies the expanders per module block in pyvauto.py's expand_all
+// order. (AUTOINPUT/OUTPUT/WIRE/LOGIC/SENSE are inserted by later tasks.)
 func ExpandAll(content, filePath string, proj *Project) string {
-	content = ExpandAutoinst(content, filePath, proj)
-	content = ExpandAutoarg(content, filePath, proj)
-	return content
+	return perModuleBlock(content, func(block string) string {
+		block = ExpandAutoinst(block, filePath, proj)
+		block = ExpandAutoarg(block, filePath, proj)
+		return block
+	})
 }
 
 // --- small string helpers matching Python str.strip/lstrip/rstrip ---
