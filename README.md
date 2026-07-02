@@ -9,7 +9,7 @@ A Python Verilog automation tool that brings Emacs `verilog-mode`-style AUTO exp
 ## Features
 
 - ✅ **Mixed-mode support**: every AUTO tag coexists with manual declarations — no duplicate definitions.
-- ✅ **AUTOINST**: auto-generates instance port connections (manual connections are detected and de-duplicated).
+- ✅ **AUTOINST**: auto-generates instance port connections (manual connections are detected and de-duplicated). Re-running **reconciles** against the sub-module's current ports — removed ports drop, new ports are added in-group, manual connections before the tag are kept, and bus widths are refreshed.
 - ✅ **AUTOARG**: maintains the module port list in both **ANSI (mixed-mode)** and **Non-ANSI** styles. The Non-ANSI list is regenerated on every run and grouped by direction under `// Outputs` / `// Inouts` / `// Inputs` headers, just like Emacs.
 - ✅ **AUTOINPUT / AUTOOUTPUT**: pulls undeclared input/output ports up from sub-instances and declares them.
 - ✅ **AUTOWIRE**: declares the `wire`s needed to interconnect instantiated modules.
@@ -72,6 +72,7 @@ sub_module u_inst (
     /*AUTOINST*/           // auto-fills rst_n, data_i, data_o
 );
 ```
+Run it again after the sub-module's ports change and AUTOINST reconciles the list: a deleted port's connection disappears, a new port is added under its `// Outputs` / `// Inputs` group, `.clk(my_special_clk)` (before the tag) is left untouched, and an existing connection keeps its wire name while its bus width is refreshed to the module port.
 
 #### 2. ANSI mixed-mode AUTOARG
 Put `/*AUTOARG*/` right in the header; the tool generates the full port list from the body declarations:
