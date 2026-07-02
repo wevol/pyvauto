@@ -196,3 +196,45 @@ func ExpandAutoinput(content, filePath string, proj *Project) string {
 func ExpandAutooutput(content, filePath string, proj *Project) string {
 	return expandAutoPort(content, filePath, "AUTOOUTPUT", "output", proj)
 }
+
+// expandAutoSignals ports _expand_auto_signals (AUTOWIRE / AUTOLOGIC): declare
+// signals for undeclared nets driven by sub-instance outputs.
+func expandAutoSignals(content, filePath, tagName, signalType string, proj *Project) string {
+	re := regexp.MustCompile(`(?is)(/\*` + tagName + `\*/)(\s*// Beginning.*?// End of automatics)?`)
+	loc := re.FindStringSubmatchIndex(content)
+	if loc == nil {
+		return content
+	}
+	tag := content[loc[2]:loc[3]]
+	existingBlock := ""
+	if loc[4] >= 0 {
+		existingBlock = content[loc[4]:loc[5]]
+	}
+	contentForSignals := content
+	if existingBlock != "" {
+		contentForSignals = strings.Replace(content, existingBlock, "", 1)
+	}
+	insts := GetInstantiations(content)
+	newSignals := collectAutoDecls(contentForSignals, insts, "output", signalType, true, proj)
+	if len(newSignals) == 0 {
+		return content[:loc[0]] + tag + content[loc[1]:]
+	}
+	commentType := "wires"
+	if signalType != "wire" {
+		commentType = "logic"
+	}
+	// NB: Python emits a trailing space after the comment type ("wires \n").
+	replacement := "/*" + tagName + "*/\n    // Beginning of automatic " + commentType + " \n    " +
+		strings.Join(newSignals, "\n    ") + "\n    // End of automatics"
+	return content[:loc[0]] + replacement + content[loc[1]:]
+}
+
+// ExpandAutowire ports expand_autowire.
+func ExpandAutowire(content, filePath string, proj *Project) string {
+	return expandAutoSignals(content, filePath, "AUTOWIRE", "wire", proj)
+}
+
+// ExpandAutologic ports expand_autologic.
+func ExpandAutologic(content, filePath string, proj *Project) string {
+	return expandAutoSignals(content, filePath, "AUTOLOGIC", "logic", proj)
+}

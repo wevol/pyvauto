@@ -1,0 +1,10 @@
+module sub (output [7:0] q);
+endmodule
+
+module top;
+    /*AUTOWIRE*/
+    // Beginning of automatic wires 
+    wire [7:0] q;
+    // End of automatics
+    sub u (.q(q));
+endmodule

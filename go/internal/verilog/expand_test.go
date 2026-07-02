@@ -69,3 +69,23 @@ func TestAutoinstWidthGolden(t *testing.T)  { autoinstGolden(t, "autoinst_width"
 func TestAutoinputBodyGolden(t *testing.T)  { expandGolden(t, "autoinput_body") }
 func TestAutooutputAnsiGolden(t *testing.T) { expandGolden(t, "autooutput_ansi") }
 func TestAutoinputConstGolden(t *testing.T) { expandGolden(t, "autoinput_const") }
+func TestAutowireGolden(t *testing.T)       { expandGolden(t, "autowire_basic") }
+func TestAutologicMixedGolden(t *testing.T) { expandGolden(t, "autologic_mixed") }
+
+func TestExpandAllIdempotent(t *testing.T) {
+	for _, name := range []string{"autowire_basic", "autologic_mixed", "autoinput_body"} {
+		in, err := os.ReadFile(filepath.Join("..", "..", "testdata", "golden", name+".golden"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		proj := NewProject()
+		for _, m := range ParseModules(string(in)) {
+			mm := m
+			proj.Modules[mm.Name] = &mm
+		}
+		got := ExpandAll(string(in), name+".sv", proj)
+		if got != string(in) {
+			t.Fatalf("%s not idempotent\n--- got ---\n%q\n--- want ---\n%q", name, got, string(in))
+		}
+	}
+}

@@ -22,6 +22,8 @@ func ExpandAll(content, filePath string, proj *Project) string {
 		block = ExpandAutoinst(block, filePath, proj)
 		block = ExpandAutoinput(block, filePath, proj)
 		block = ExpandAutooutput(block, filePath, proj)
+		block = ExpandAutowire(block, filePath, proj)
+		block = ExpandAutologic(block, filePath, proj)
 		block = ExpandAutoarg(block, filePath, proj)
 		return block
 	})
