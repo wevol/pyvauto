@@ -1,0 +1,12 @@
+module marg (/*AUTOARG*/
+    // Outputs
+    valid, ready,
+    // Inouts
+    io0, io1,
+    // Inputs
+    clk, rst_n, en
+);
+    input        clk, rst_n, en;
+    output       valid, ready;
+    inout        io0, io1;
+endmodule
