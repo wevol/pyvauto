@@ -67,6 +67,25 @@ func TestParsePortsAnsiSharedDirectionCommaList(t *testing.T) {
 	}
 }
 
+func TestGetInstantiationsIgnoresComments(t *testing.T) {
+	src := "module top;\n // sub u_c (.x(y));\n sub u_real (.x(y));\nendmodule\n"
+	insts := GetInstantiations(src)
+	names := map[string]bool{}
+	for _, in := range insts {
+		names[in.InstanceName] = true
+	}
+	if !names["u_real"] || names["u_c"] {
+		t.Fatalf("instances = %+v", insts)
+	}
+}
+
+func TestParseNamedPortConnectionsNested(t *testing.T) {
+	got := ParseNamedPortConnections(".sel(mux(a, b)), .clk(1'b0)")
+	if got["sel"] != "mux(a, b)" || got["clk"] != "1'b0" {
+		t.Fatalf("conns = %+v", got)
+	}
+}
+
 func TestStripCommentsPreservesStrings(t *testing.T) {
 	src := `x = "http://a /* b */"; // c`
 	out := StripComments(src)

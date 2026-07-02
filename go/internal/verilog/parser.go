@@ -119,3 +119,73 @@ func ParseModules(content string) []Module {
 	}
 	return mods
 }
+
+// namedPortConnRe ports _NAMED_PORT_RE (`\.(\w+)\s*\(`), anchored per position.
+var namedPortConnRe = regexp.MustCompile(`^\.(\w+)\s*\(`)
+
+// ParseNamedPortConnections parses `.name(value)` pairs, depth-counting parens
+// so nested `(...)`/`{...}` in the value are captured whole (ports
+// parse_named_port_connections).
+func ParseNamedPortConnections(block string) map[string]string {
+	ports := map[string]string{}
+	n := len(block)
+	i := 0
+	for i < n {
+		if block[i] != '.' {
+			i++
+			continue
+		}
+		m := namedPortConnRe.FindStringSubmatchIndex(block[i:])
+		if m == nil {
+			i++
+			continue
+		}
+		name := block[i+m[2] : i+m[3]]
+		start := i + m[1] // just past the '('
+		j := start
+		depth := 1
+		for j < n && depth > 0 {
+			switch block[j] {
+			case '(':
+				depth++
+			case ')':
+				depth--
+			}
+			j++
+		}
+		if depth != 0 {
+			break
+		}
+		ports[name] = strings.TrimSpace(block[start : j-1])
+		i = j
+	}
+	return ports
+}
+
+var instRe = regexp.MustCompile(`(?s)(\w+)\s+(\w+)\s*(#\s*\(.*?\))?\s*\(([^;]*?)\)\s*;`)
+
+// instSkipKeywords ports _INST_SKIP_KEYWORDS.
+var instSkipKeywords = map[string]bool{
+	"module": true, "if": true, "always": true, "initial": true, "case": true,
+	"generate": true, "assign": true, "begin": true, "endmodule": true,
+	"function": true, "task": true,
+}
+
+// GetInstantiations extracts module instantiations (ports get_instantiations),
+// skipping Verilog keywords and comment-masked text.
+func GetInstantiations(content string) []Inst {
+	c := StripComments(content)
+	var insts []Inst
+	for _, mm := range instRe.FindAllStringSubmatch(c, -1) {
+		modName := mm[1]
+		if instSkipKeywords[modName] {
+			continue
+		}
+		insts = append(insts, Inst{
+			ModuleName:   modName,
+			InstanceName: mm[2],
+			Ports:        ParseNamedPortConnections(mm[4]),
+		})
+	}
+	return insts
+}
