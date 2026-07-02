@@ -1,0 +1,13 @@
+module sub (input [7:0] data_i, output [7:0] data_o);
+endmodule
+
+module top;
+    wire [15:0] data_i;
+    wire [7:0] data_o;
+    sub u  (/*AUTOINST*/
+    // Outputs
+    .data_o (data_o[7:0]),
+    // Inputs
+    .data_i (data_i[7:0])  // WARNING: width mismatch — sub.data_i is [7:0], local data_i is [15:0]
+    );
+endmodule

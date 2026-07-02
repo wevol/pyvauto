@@ -39,12 +39,13 @@ func TestAutoargGolden(t *testing.T) {
 	runGolden(t, "autoarg_basic", ExpandAutoarg)
 }
 
-func TestAutoinstGolden(t *testing.T) {
-	in, err := os.ReadFile(filepath.Join("..", "..", "testdata", "inputs", "autoinst_basic.sv"))
+func autoinstGolden(t *testing.T, name string) {
+	t.Helper()
+	in, err := os.ReadFile(filepath.Join("..", "..", "testdata", "inputs", name+".sv"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := os.ReadFile(filepath.Join("..", "..", "testdata", "golden", "autoinst_basic.golden"))
+	want, err := os.ReadFile(filepath.Join("..", "..", "testdata", "golden", name+".golden"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,8 +54,13 @@ func TestAutoinstGolden(t *testing.T) {
 		mm := m
 		proj.Modules[mm.Name] = &mm
 	}
-	got := ExpandAutoinst(string(in), "autoinst_basic.sv", proj)
+	// Go through ExpandAll so local-signal widths are computed per module block,
+	// exactly like the Python oracle (which runs per _per_module_block).
+	got := ExpandAll(string(in), name+".sv", proj)
 	if got != string(want) {
 		t.Fatalf("mismatch\n--- got ---\n%q\n--- want ---\n%q", got, string(want))
 	}
 }
+
+func TestAutoinstGolden(t *testing.T)      { autoinstGolden(t, "autoinst_basic") }
+func TestAutoinstWidthGolden(t *testing.T) { autoinstGolden(t, "autoinst_width") }

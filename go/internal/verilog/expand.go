@@ -231,18 +231,28 @@ func reconcileSignal(existing, width string) string {
 	return m[1] + width
 }
 
-// buildAutoinstPortLines ports _build_autoinst_port_lines (MVP: no width-mismatch
-// warning comments — those are out of the Go MVP scope).
-func buildAutoinstPortLines(ports []Port, afterConns map[string]string) string {
+// buildAutoinstPortLines ports _build_autoinst_port_lines, including the
+// width-mismatch warning comment (vs the enclosing module's local signals).
+func buildAutoinstPortLines(ports []Port, afterConns map[string]string, modName string, localWidths map[string]string) string {
 	var lines []string
+	lineWarnings := map[int]string{}
 	formatP := func(p Port) string {
+		ex, existing := afterConns[p.Name]
 		var signal string
-		if ex, ok := afterConns[p.Name]; ok {
+		if existing {
 			signal = reconcileSignal(ex, p.Width)
 		} else {
 			signal = p.Name + p.Width
 		}
-		return "    ." + p.Name + " (" + signal + ")"
+		line := "    ." + p.Name + " (" + signal + ")"
+		if !existing {
+			localW := localWidths[p.Name]
+			if widthsMismatch(p.Width, localW) {
+				lineWarnings[len(lines)] = "  // WARNING: width mismatch — " +
+					modName + "." + p.Name + " is " + p.Width + ", local " + p.Name + " is " + localW
+			}
+		}
+		return line
 	}
 	for _, dh := range []struct{ dir, header string }{
 		{"output", "    // Outputs"},
@@ -276,6 +286,9 @@ func buildAutoinstPortLines(ports []Port, afterConns map[string]string) string {
 	for k := 0; k+1 < len(portIdx); k++ {
 		lines[portIdx[k]] += ","
 	}
+	for i, w := range lineWarnings {
+		lines[i] = lines[i] + w
+	}
 	return strings.Join(lines, "\n")
 }
 
@@ -286,18 +299,19 @@ func ExpandAutoinst(content, filePath string, proj *Project) string {
 	if locs == nil {
 		return content
 	}
+	localWidths := getLocalSignalWidths(content)
 	var b strings.Builder
 	last := 0
 	for _, loc := range locs {
 		b.WriteString(content[last:loc[0]])
-		b.WriteString(autoinstReplace(content, loc, proj))
+		b.WriteString(autoinstReplace(content, loc, proj, localWidths))
 		last = loc[1]
 	}
 	b.WriteString(content[last:])
 	return b.String()
 }
 
-func autoinstReplace(content string, loc []int, proj *Project) string {
+func autoinstReplace(content string, loc []int, proj *Project, localWidths map[string]string) string {
 	full := content[loc[0]:loc[1]]
 	modName := content[loc[2]:loc[3]]
 	instName := content[loc[4]:loc[5]]
@@ -333,7 +347,7 @@ func autoinstReplace(content string, loc []int, proj *Project) string {
 			portsToEmit = append(portsToEmit, p)
 		}
 	}
-	portStr := buildAutoinstPortLines(portsToEmit, afterConns)
+	portStr := buildAutoinstPortLines(portsToEmit, afterConns, modName, localWidths)
 
 	beforeStripped := pyStrip(beforeTag)
 	var newPortBlock string
