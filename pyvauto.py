@@ -934,6 +934,10 @@ class VerilogExpander:
                 if not (p_def and p_def.direction == filter_direction):
                     continue
                 base = s_name.split("[")[0].strip()
+                # Skip constants/literals/expressions (e.g. 1'b0, {a, b}, func(x));
+                # only a real net identifier can be propagated up.
+                if not re.match(r"^[A-Za-z_]\w*$", base):
+                    continue
                 if base not in local_signals:
                     width = f"{p_def.width} " if p_def.width else ""
                     decl = f"{emit_keyword} {width}{base}{suffix}"

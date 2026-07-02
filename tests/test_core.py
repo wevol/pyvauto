@@ -322,6 +322,59 @@ class TestVerilogExpander:
         twice = expander.expand_autoarg(once, "m.sv")
         assert once == twice
 
+    def test_autoinput_skips_constant_connection(self):
+        """A sub input tied to a constant (.clk(1'b0)) must not become a parent input,
+        and must not produce a phantom `input 1;`; real nets still propagate."""
+        project = VerilogProject()
+        sub = "module sub (input clk, input rst_n);\nendmodule\n"
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        expander = VerilogExpander(project)
+        top = """
+        module top;
+            /*AUTOINPUT*/
+            sub u (.clk(1'b0), .rst_n(my_rst));
+        endmodule
+        """
+        result = expander.expand_autoinput(top, "top.sv")
+        assert "input 1'b0;" not in result
+        assert "input 1;" not in result
+        assert "input my_rst;" in result
+
+    def test_autoinput_keeps_bit_select_base(self):
+        """A bit-select connection still propagates its base net."""
+        project = VerilogProject()
+        sub = "module sub (input sel);\nendmodule\n"
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        expander = VerilogExpander(project)
+        top = """
+        module top;
+            /*AUTOINPUT*/
+            sub u (.sel(bus[0]));
+        endmodule
+        """
+        result = expander.expand_autoinput(top, "top.sv")
+        assert "input bus;" in result
+
+    def test_autowire_skips_non_identifier_connection(self):
+        """AUTOWIRE must not declare a wire for a concatenation/expression output
+        connection, but still declares one for a real net."""
+        project = VerilogProject()
+        sub = "module sub (output [7:0] q, output [7:0] r);\nendmodule\n"
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        expander = VerilogExpander(project)
+        top = """
+        module top;
+            /*AUTOWIRE*/
+            sub u (.q({a, b}), .r(real_net));
+        endmodule
+        """
+        result = expander.expand_autowire(top, "top.sv")
+        assert "wire [7:0] {a, b};" not in result
+        assert "wire [7:0] real_net;" in result
+
 
 class TestBugFixes:
     """Regression tests: ensure fixed logic bugs do not resurface."""
