@@ -19,6 +19,7 @@ import pytest
 REPO = Path(__file__).parent.parent
 PLUGIN = REPO / "plugin" / "pyvauto.vim"
 VIM = shutil.which("vim")
+GO = shutil.which("go")
 
 pytestmark = pytest.mark.skipif(VIM is None, reason="vim not installed")
 
@@ -117,3 +118,38 @@ def test_plugin_end_to_end_delete(tmp_path):
     out = top.read_text()
     assert "/*AUTOINST*/" in out
     assert ".clk" not in out and ".data_o" not in out
+
+
+@pytest.mark.skipif(GO is None, reason="go not installed")
+def test_plugin_uses_go_binary_via_g_pyvauto_bin(tmp_path):
+    """With g:pyvauto_bin set, :Pyvauto expands via the compiled Go binary
+    (no Python) and produces the grouped AUTOINST output."""
+    binpath = tmp_path / "pyvauto_go"
+    build = subprocess.run(
+        [GO, "build", "-o", str(binpath), "./cmd/pyvauto"],
+        cwd=str(REPO / "go"),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if build.returncode != 0:
+        pytest.skip(f"go build failed: {build.stderr}")
+
+    (tmp_path / "sub.sv").write_text(SUB)
+    top = tmp_path / "top.sv"
+    top.write_text(TOP)
+
+    script = tmp_path / "run.vim"
+    script.write_text(
+        f"let g:pyvauto_bin='{binpath}'\n"
+        f"source {PLUGIN}\n"
+        f"cd {tmp_path}\n"
+        "edit top.sv\n"
+        "Pyvauto\n"
+        "qa!\n"
+    )
+    _run_vim(script)
+
+    out = top.read_text()
+    assert ".clk" in out and ".data_i" in out and ".data_o" in out
+    assert "// Outputs" in out  # Go grouped AUTOINST output
