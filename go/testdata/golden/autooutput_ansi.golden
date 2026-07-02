@@ -1,0 +1,7 @@
+module sub (input clk, output valid);
+endmodule
+
+module top (input clk, output valid
+);
+    sub u (.clk(clk), .valid(valid));
+endmodule

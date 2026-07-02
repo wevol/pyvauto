@@ -20,6 +20,8 @@ func perModuleBlock(content string, fn func(string) string) string {
 func ExpandAll(content, filePath string, proj *Project) string {
 	return perModuleBlock(content, func(block string) string {
 		block = ExpandAutoinst(block, filePath, proj)
+		block = ExpandAutoinput(block, filePath, proj)
+		block = ExpandAutooutput(block, filePath, proj)
 		block = ExpandAutoarg(block, filePath, proj)
 		return block
 	})
@@ -335,10 +337,10 @@ func autoinstReplace(content string, loc []int, proj *Project, localWidths map[s
 	afterTag := portBlock[tagIndex+len(tag):]
 
 	beforeConns := ParseNamedPortConnections(StripComments(beforeTag))
-	afterConns := ParseNamedPortConnections(StripComments(afterTag))
+	afterConns := connMap(ParseNamedPortConnections(StripComments(afterTag)))
 	claimed := map[string]bool{}
-	for k := range beforeConns {
-		claimed[k] = true
+	for _, c := range beforeConns {
+		claimed[c.Name] = true
 	}
 
 	var portsToEmit []Port

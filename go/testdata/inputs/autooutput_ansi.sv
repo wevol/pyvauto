@@ -1,0 +1,6 @@
+module sub (input clk, output valid);
+endmodule
+
+module top (input clk, /*AUTOOUTPUT*/);
+    sub u (.clk(clk), .valid(valid));
+endmodule

@@ -1,0 +1,10 @@
+module sub (input clk, input rst_n);
+endmodule
+
+module top;
+    /*AUTOINPUT*/
+    // Beginning of automatic inputs
+    input my_rst;
+    // End of automatics
+    sub u (.clk(1'b0), .rst_n(my_rst));
+endmodule

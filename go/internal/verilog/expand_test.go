@@ -39,6 +39,8 @@ func TestAutoargGolden(t *testing.T) {
 	runGolden(t, "autoarg_basic", ExpandAutoarg)
 }
 
+func expandGolden(t *testing.T, name string) { autoinstGolden(t, name) }
+
 func autoinstGolden(t *testing.T, name string) {
 	t.Helper()
 	in, err := os.ReadFile(filepath.Join("..", "..", "testdata", "inputs", name+".sv"))
@@ -62,5 +64,8 @@ func autoinstGolden(t *testing.T, name string) {
 	}
 }
 
-func TestAutoinstGolden(t *testing.T)      { autoinstGolden(t, "autoinst_basic") }
-func TestAutoinstWidthGolden(t *testing.T) { autoinstGolden(t, "autoinst_width") }
+func TestAutoinstGolden(t *testing.T)       { autoinstGolden(t, "autoinst_basic") }
+func TestAutoinstWidthGolden(t *testing.T)  { autoinstGolden(t, "autoinst_width") }
+func TestAutoinputBodyGolden(t *testing.T)  { expandGolden(t, "autoinput_body") }
+func TestAutooutputAnsiGolden(t *testing.T) { expandGolden(t, "autooutput_ansi") }
+func TestAutoinputConstGolden(t *testing.T) { expandGolden(t, "autoinput_const") }

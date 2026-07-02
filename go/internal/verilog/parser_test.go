@@ -81,7 +81,8 @@ func TestGetInstantiationsIgnoresComments(t *testing.T) {
 
 func TestParseNamedPortConnectionsNested(t *testing.T) {
 	got := ParseNamedPortConnections(".sel(mux(a, b)), .clk(1'b0)")
-	if got["sel"] != "mux(a, b)" || got["clk"] != "1'b0" {
+	if len(got) != 2 || got[0].Name != "sel" || got[0].Signal != "mux(a, b)" ||
+		got[1].Name != "clk" || got[1].Signal != "1'b0" {
 		t.Fatalf("conns = %+v", got)
 	}
 }

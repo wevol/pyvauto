@@ -12,8 +12,14 @@ type Module struct {
 	Ports []Port
 }
 
+// PortConn is one `.name(signal)` connection, kept in source order.
+type PortConn struct {
+	Name   string
+	Signal string
+}
+
 type Inst struct {
 	ModuleName   string
 	InstanceName string
-	Ports        map[string]string // port name -> connection expr
+	Ports        []PortConn // in source order (Python dict insertion order)
 }

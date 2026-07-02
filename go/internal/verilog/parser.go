@@ -123,11 +123,12 @@ func ParseModules(content string) []Module {
 // namedPortConnRe ports _NAMED_PORT_RE (`\.(\w+)\s*\(`), anchored per position.
 var namedPortConnRe = regexp.MustCompile(`^\.(\w+)\s*\(`)
 
-// ParseNamedPortConnections parses `.name(value)` pairs, depth-counting parens
-// so nested `(...)`/`{...}` in the value are captured whole (ports
-// parse_named_port_connections).
-func ParseNamedPortConnections(block string) map[string]string {
-	ports := map[string]string{}
+// ParseNamedPortConnections parses `.name(value)` pairs in source order,
+// depth-counting parens so nested `(...)`/`{...}` in the value are captured
+// whole (ports parse_named_port_connections; Python returns an insertion-ordered
+// dict, so order is preserved here).
+func ParseNamedPortConnections(block string) []PortConn {
+	var conns []PortConn
 	n := len(block)
 	i := 0
 	for i < n {
@@ -156,10 +157,20 @@ func ParseNamedPortConnections(block string) map[string]string {
 		if depth != 0 {
 			break
 		}
-		ports[name] = strings.TrimSpace(block[start : j-1])
+		conns = append(conns, PortConn{Name: name, Signal: strings.TrimSpace(block[start : j-1])})
 		i = j
 	}
-	return ports
+	return conns
+}
+
+// connMap collapses ordered connections into a name->signal map (last wins,
+// like a Python dict).
+func connMap(conns []PortConn) map[string]string {
+	m := make(map[string]string, len(conns))
+	for _, c := range conns {
+		m[c.Name] = c.Signal
+	}
+	return m
 }
 
 var instRe = regexp.MustCompile(`(?s)(\w+)\s+(\w+)\s*(#\s*\(.*?\))?\s*\(([^;]*?)\)\s*;`)
