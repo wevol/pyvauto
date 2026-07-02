@@ -7,8 +7,10 @@ import (
 )
 
 // ExpandAll applies the MVP expanders (AUTOINST then AUTOARG) in the same
-// relative order as pyvauto.py's expand_all. Tasks 6-7 fill AUTOINST in.
+// relative order as pyvauto.py's expand_all.
 func ExpandAll(content, filePath string, proj *Project) string {
+	content = ExpandAutoinst(content, filePath, proj)
+	content = ExpandAutoarg(content, filePath, proj)
 	return content
 }
 

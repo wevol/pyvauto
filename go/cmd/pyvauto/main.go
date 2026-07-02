@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/wevol/pyvauto/go/internal/verilog"
 )
@@ -49,9 +50,16 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+		// Resolve only the sub-modules this file instantiates, searching the
+		// file's own directory plus any --incdir dirs.
 		proj := verilog.NewProject()
-		// Task 4 fills the project via resolution (file dir + incdirs).
-		_ = incdirs
+		needed := map[string]bool{}
+		for _, inst := range verilog.GetInstantiations(string(content)) {
+			needed[inst.ModuleName] = true
+		}
+		roots := append([]string{filepath.Dir(fpath)}, incdirs...)
+		proj.Resolve(roots, needed)
+
 		out := verilog.ExpandAll(string(content), fpath, proj)
 		if out != string(content) {
 			if err := os.WriteFile(fpath, []byte(out), 0644); err != nil {
