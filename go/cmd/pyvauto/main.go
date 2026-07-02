@@ -31,12 +31,8 @@ func main() {
 		}
 	}
 
-	if deleteMode {
-		fmt.Fprintln(os.Stderr, "--delete is not implemented in the Go MVP")
-		os.Exit(2)
-	}
 	if len(files) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: pyvauto [--incdir DIR]... <file>...")
+		fmt.Fprintln(os.Stderr, "usage: pyvauto [--delete] [--incdir DIR]... <file>...")
 		os.Exit(2)
 	}
 
@@ -50,23 +46,34 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		// Resolve only the sub-modules this file instantiates, searching the
-		// file's own directory plus any --incdir dirs.
-		proj := verilog.NewProject()
-		needed := map[string]bool{}
-		for _, inst := range verilog.GetInstantiations(string(content)) {
-			needed[inst.ModuleName] = true
-		}
-		roots := append([]string{filepath.Dir(fpath)}, incdirs...)
-		proj.Resolve(roots, needed)
 
-		out := verilog.ExpandAll(string(content), fpath, proj)
+		var out string
+		if deleteMode {
+			// Un-expand does not consult the module index.
+			out = verilog.DeleteAll(string(content), fpath)
+		} else {
+			// Resolve only the sub-modules this file instantiates, searching the
+			// file's own directory plus any --incdir dirs.
+			proj := verilog.NewProject()
+			needed := map[string]bool{}
+			for _, inst := range verilog.GetInstantiations(string(content)) {
+				needed[inst.ModuleName] = true
+			}
+			roots := append([]string{filepath.Dir(fpath)}, incdirs...)
+			proj.Resolve(roots, needed)
+			out = verilog.ExpandAll(string(content), fpath, proj)
+		}
+
+		verb := "expanded"
+		if deleteMode {
+			verb = "deleted"
+		}
 		if out != string(content) {
 			if err := os.WriteFile(fpath, []byte(out), 0644); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
 			}
-			fmt.Printf("Successfully expanded %s\n", fpath)
+			fmt.Printf("Successfully %s %s\n", verb, fpath)
 		} else {
 			fmt.Printf("No changes made to %s\n", fpath)
 		}

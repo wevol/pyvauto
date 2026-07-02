@@ -74,6 +74,30 @@ func TestCLIExpandsInstAndArg(t *testing.T) {
 	}
 }
 
+func TestCLIDeleteRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "sub.v"),
+		[]byte("module sub(input clk, output [7:0] q);\nendmodule\n"), 0644)
+	top := filepath.Join(dir, "top.sv")
+	os.WriteFile(top, []byte("module top;\n sub u (/*AUTOINST*/);\nendmodule\n"), 0644)
+
+	bin := buildBinary(t)
+	if out, err := exec.Command(bin, top).CombinedOutput(); err != nil {
+		t.Fatalf("expand: %v\n%s", err, out)
+	}
+	if b, _ := os.ReadFile(top); !strings.Contains(string(b), ".q") {
+		t.Fatalf("expand did not fill:\n%s", b)
+	}
+	if out, err := exec.Command(bin, "--delete", top).CombinedOutput(); err != nil {
+		t.Fatalf("delete: %v\n%s", err, out)
+	}
+	b, _ := os.ReadFile(top)
+	s := string(b)
+	if strings.Contains(s, ".q") || !strings.Contains(s, "/*AUTOINST*/") {
+		t.Fatalf("delete did not un-expand:\n%s", s)
+	}
+}
+
 func TestCLIIncdirFindsSubmodule(t *testing.T) {
 	dir := t.TempDir()
 	proj := filepath.Join(dir, "proj")

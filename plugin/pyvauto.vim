@@ -62,10 +62,10 @@ function! s:Run(delete) abort
     let l:verb = a:delete ? 'Deleting' : 'Expanding'
     let l:noun = a:delete ? 'deletion' : 'expansion'
     " If g:pyvauto_bin points at a compiled binary (e.g. the Go build), use it
-    " directly for the expand path — no Python needed. The Go MVP has no delete,
-    " so the un-expand path always falls back to Python.
-    if !a:delete && exists('g:pyvauto_bin') && !empty(g:pyvauto_bin)
-        let l:cmd = shellescape(g:pyvauto_bin) . ' ' . shellescape(expand('%:p'))
+    " directly — no Python needed — for both expand and un-expand (--delete).
+    if exists('g:pyvauto_bin') && !empty(g:pyvauto_bin)
+        let l:cmd = shellescape(g:pyvauto_bin) . l:flag . ' ' .
+                  \ shellescape(expand('%:p'))
     else
         let l:cmd = shellescape(g:pyvauto_python) . ' ' .
                   \ shellescape(g:pyvauto_script) . l:flag . ' ' .
