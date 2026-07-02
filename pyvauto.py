@@ -468,6 +468,17 @@ class VerilogExpander:
             block = block.rstrip() + ","
         return block
 
+    @staticmethod
+    def _reconcile_signal(existing: str, width_str: str) -> str:
+        """Reuse an existing connection's signal, refreshing its bus width to
+        the module port's `width_str`. A simple identifier (optionally with a
+        `[..]`) keeps its base name and takes `width_str`; a complex expression
+        (concatenation, constant, function call, …) is returned verbatim."""
+        m = re.match(r"^\s*(\w+)\s*(\[[^\]]*\])?\s*$", existing)
+        if not m:
+            return existing
+        return f"{m.group(1)}{width_str}"
+
     def _mask_comments(self, text: str) -> str:
         """Replace comment characters with spaces (preserving line layout) so
         regex passes see no comments — but keep AUTO tags and string literals
@@ -510,43 +521,43 @@ class VerilogExpander:
                 print(f"Warning: Module {mod_name} not found in project.")
                 return match.group(0)
 
-            # Find already connected ports and their signals
-            # Search ENTIRE port_block so we don't duplicate previously auto-generated ports
-
-            clean_block = self._strip_comments(port_block)
-            manual_conns = parse_named_port_connections(clean_block)
-
-            existing_ports = set(manual_conns.keys())
-            self._warn_manual_connection_widths(
-                module, manual_conns, mod_name, inst_name
-            )
-
-            ports_to_expand = [p for p in module.ports if p.name not in existing_ports]
-
-            if not ports_to_expand:
-                return match.group(0)
-
-            port_str = self._build_autoinst_port_lines(
-                ports_to_expand, mod_name, local_widths, port_block, autoinst_tag
-            )
-
-            # Construct replacement: just the tag + new content, no block markers
-            # Handle leading comma if needed
+            # Reconcile against the module's current ports. Connections BEFORE
+            # the tag are manual: keep them verbatim and claim their ports. The
+            # region AFTER the tag is rebuilt from the module ports each run —
+            # removed ports drop out, new ports are added, and existing signal
+            # names are reused (bus widths refreshed to the module).
             tag_index = port_block.find(autoinst_tag)
-            before_tag = port_block[:tag_index].strip()
-            port_str = self._apply_comma_context(port_str, before_tag, "")
+            before_tag = port_block[:tag_index]
+            after_tag = port_block[tag_index + len(autoinst_tag):]
 
-            replacement = f"/*AUTOINST*/\n{port_str}"
+            before_conns = parse_named_port_connections(
+                self._strip_comments(before_tag)
+            )
+            after_conns = parse_named_port_connections(
+                self._strip_comments(after_tag)
+            )
+            claimed = set(before_conns.keys())
 
-            new_port_block = port_block.replace(autoinst_tag, replacement)
+            all_conns = dict(after_conns)
+            all_conns.update(before_conns)
+            self._warn_manual_connection_widths(
+                module, all_conns, mod_name, inst_name
+            )
 
-            # Clean up trailing comma: check global port list context
-            # This is tricky because we just built the block.
-            # If we rely on the previous logic: new_port_block = re.sub(r",(\s*)$", r"\1", new_port_block)
-            # This cleans comma at end of the WHOLE port block list.
+            ports_to_emit = [p for p in module.ports if p.name not in claimed]
+            port_str = self._build_autoinst_port_lines(
+                ports_to_emit, mod_name, local_widths, after_conns
+            )
+
+            before_stripped = before_tag.strip()
+            if port_str.strip():
+                port_str = self._apply_comma_context(port_str, before_stripped, "")
+                new_port_block = before_tag + f"/*AUTOINST*/\n{port_str}"
+            else:
+                new_port_block = before_tag + "/*AUTOINST*/"
+
+            # Tidy trailing / doubled commas around the manual prefix.
             new_port_block = re.sub(r",(\s*)$", r"\1", new_port_block)
-            # Collapse accidental double commas introduced when surrounding manual
-            # connections already had their own commas.
             new_port_block = re.sub(r",(\s*),", r",\1", new_port_block)
 
             result = f"{mod_name} {inst_name} {param_override or ''} ({new_port_block}\n    );"
@@ -575,63 +586,53 @@ class VerilogExpander:
                 )
 
     def _build_autoinst_port_lines(
-        self, ports_to_expand, mod_name, local_widths, port_block, autoinst_tag
+        self, ports_to_emit, mod_name, local_widths, after_conns
     ):
-        """Render the auto-generated /*AUTOINST*/ port connections: group by
-        direction, add commas, and append width-mismatch warning comments."""
+        """Render the /*AUTOINST*/ connections: group by direction, reuse any
+        existing signal's base name (refreshing bus width to the module port),
+        and append width-mismatch warning comments. This block is the last
+        content before ')', so the final port carries no trailing comma."""
         lines = []
-        # Track warning-comment suffixes keyed by line index so that any
-        # later comma-insertion step puts the comma BEFORE the comment.
         line_warnings: Dict[int, str] = {}
 
         def format_p(p):
-            padding = " "
             width_str = p.width if p.width else ""
-            line = f"    .{p.name}{padding}({p.name}{width_str})"
+            existing = after_conns.get(p.name)
+            if existing is not None:
+                signal = self._reconcile_signal(existing, width_str)
+            else:
+                signal = f"{p.name}{width_str}"
+            line = f"    .{p.name} ({signal})"
             local_w = local_widths.get(p.name, "")
-            if _widths_mismatch(p.width, local_w):
+            if existing is None and _widths_mismatch(p.width, local_w):
                 line_warnings[len(lines)] = (
                     f"  // WARNING: width mismatch — "
                     f"{mod_name}.{p.name} is {p.width}, local {p.name} is {local_w}"
                 )
             return line
 
-        # Grouped directions first, each under its header, then any others
-        # in original order.
         for direction, header in (
             ("output", "    // Outputs"),
             ("inout", "    // Inouts"),
             ("input", "    // Inputs"),
         ):
-            members = [p for p in ports_to_expand if p.direction == direction]
+            members = [p for p in ports_to_emit if p.direction == direction]
             if members:
                 lines.append(header)
                 for p in members:
                     lines.append(format_p(p))
 
-        for p in ports_to_expand:
+        for p in ports_to_emit:
             if p.direction not in ("output", "inout", "input"):
                 lines.append(format_p(p))
 
-        # Add commas to port lines
         port_indices = [
             i for i, line in enumerate(lines) if line.strip().startswith(".")
         ]
-
         if port_indices:
-            # Add comma to all except last port
             for i in port_indices[:-1]:
                 lines[i] += ","
 
-            # Logic for trailing comma: if there is content after the tag, add comma
-            tag_index = port_block.find(autoinst_tag)
-            after_tag = port_block[tag_index + len(autoinst_tag) :].strip()
-
-            if after_tag and not after_tag.startswith(","):
-                lines[port_indices[-1]] += ","
-
-        # Append warning comments AFTER comma-insertion so the comma
-        # stays part of the port list and is not swallowed by the comment.
         for i, warning in line_warnings.items():
             lines[i] = lines[i] + warning
 

@@ -932,6 +932,133 @@ endmodule
         # 其餘埠補齊
         assert ".other" in result and ".out" in result
 
+    def test_autoinst_reconcile_removes_and_adds(self):
+        """Re-run after sub ports change: removed port drops, new port added
+        in-group, manual before-tag connection kept, no duplicate headers."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        sub = """
+        module sub (input clk, input rst_n, output [7:0] data_o, output valid);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        top = """
+        module top;
+            sub u (
+                .clk(my_special_clk),
+                /*AUTOINST*/
+                // Outputs
+                .data_o (data_o[7:0]),
+                // Inputs
+                .rst_n (rst_n),
+                .data_i (data_i[7:0])
+            );
+        endmodule
+        """
+        result = expander.expand_autoinst(top, "top.sv")
+        assert "my_special_clk" in result
+        assert result.count(".clk") == 1
+        assert ".data_i" not in result
+        assert ".valid" in result
+        assert result.count("// Outputs") == 1
+
+    def test_autoinst_reconcile_refreshes_width_keeps_wire_name(self):
+        """An after-tag manual connection keeps its wire name but takes the
+        module port's bus width."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        sub = """
+        module sub (output [15:0] data_o);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        top = """
+        module top;
+            sub u (
+                /*AUTOINST*/
+                // Outputs
+                .data_o (my_out[7:0])
+            );
+        endmodule
+        """
+        result = expander.expand_autoinst(top, "top.sv")
+        assert ".data_o (my_out[15:0])" in result
+        assert "[7:0]" not in result
+
+    def test_autoinst_reconcile_keeps_complex_expression(self):
+        """A complex signal expression after the tag is kept verbatim; no width
+        is forced onto it."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        sub = """
+        module sub (input [7:0] data_i);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        top = """
+        module top;
+            sub u (
+                /*AUTOINST*/
+                // Inputs
+                .data_i ({a, b})
+            );
+        endmodule
+        """
+        result = expander.expand_autoinst(top, "top.sv")
+        assert ".data_i ({a, b})" in result
+        assert "{a, b}[7:0]" not in result
+
+    def test_autoinst_reconcile_idempotent(self):
+        """Two consecutive expands with unchanged ports are identical."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        sub = """
+        module sub (input clk, input [7:0] d, output [7:0] q);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        top = """
+        module top;
+            sub u (
+                .clk(my_clk),
+                /*AUTOINST*/
+            );
+        endmodule
+        """
+        once = expander.expand_autoinst(top, "top.sv")
+        twice = expander.expand_autoinst(once, "top.sv")
+        assert once == twice
+
+    def test_autoinst_reconcile_delete_round_trip(self):
+        """Expand then delete returns to a bare tag, keeping the before-tag
+        manual connection."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        sub = """
+        module sub (input clk, output [7:0] q);
+        endmodule
+        """
+        for m in project.parser.parse_file(sub, "sub.sv"):
+            project.modules[m.name] = m
+        top = """
+        module top;
+            sub u (
+                .clk(my_clk),
+                /*AUTOINST*/
+            );
+        endmodule
+        """
+        expanded = expander.expand_autoinst(top, "top.sv")
+        assert ".q" in expanded
+        deleted = expander.delete_all(expanded, "top.sv")
+        assert ".q" not in deleted
+        assert "my_clk" in deleted
+        assert "/*AUTOINST*/" in deleted
+
     def test_expand_all_is_idempotent(self):
         """冪等性: 對同一內容重複展開兩次，第二次應與第一次結果相同"""
         project = VerilogProject()
