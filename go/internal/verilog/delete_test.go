@@ -30,3 +30,8 @@ func TestDeleteAutologic(t *testing.T) { deleteGolden(t, "autologic_mixed") }
 func TestDeleteAutosense(t *testing.T) { deleteGolden(t, "autosense_comb") }
 func TestDeleteAutoarg(t *testing.T)   { deleteGolden(t, "autoarg_basic") }
 func TestDeleteAutoinput(t *testing.T) { deleteGolden(t, "autoinput_body") }
+
+// ANSI header-form AUTOINPUT/AUTOOUTPUT are now reversible: expansion keeps the
+// tag + Begin/End markers, so DeleteAll strips them back to the bare tag.
+func TestDeleteAutooutputAnsi(t *testing.T) { deleteGolden(t, "autooutput_ansi") }
+func TestDeleteAutoinputAnsi(t *testing.T)  { deleteGolden(t, "autoinput_ansi") }

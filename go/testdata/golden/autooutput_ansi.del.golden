@@ -2,9 +2,6 @@ module sub (input clk, output valid);
 endmodule
 
 module top (input clk, /*AUTOOUTPUT*/
-    // Beginning of automatic outputs
-    output valid
-    // End of automatics
 );
     sub u (.clk(clk), .valid(valid));
 endmodule

@@ -126,6 +126,10 @@ func collectAutoDecls(contentForSignals string, insts []Inst, filterDirection, e
 	return decls
 }
 
+// blockAfterTagRe matches a `// Beginning … // End of automatics` block left by
+// a previous ANSI expansion immediately after the tag (anchored at start).
+var blockAfterTagRe = regexp.MustCompile(`(?s)^\s*// Beginning of automatic \w+.*?// End of automatics`)
+
 // expandAutoPort ports _expand_auto_port (AUTOINPUT / AUTOOUTPUT), handling both
 // ANSI (port list) and Non-ANSI (body) contexts.
 func expandAutoPort(content, filePath, tagName, direction string, proj *Project) string {
@@ -139,18 +143,52 @@ func expandAutoPort(content, filePath, tagName, direction string, proj *Project)
 		portBlock := content[loc[8]:loc[9]]
 		tag := content[loc[10]:loc[11]]
 
-		insts := GetInstantiations(content)
-		newDecls := collectAutoDecls(strings.Replace(content, tag, "", 1), insts, direction, direction, false, proj)
-		if len(newDecls) == 0 {
-			kept := strings.Replace(content[loc[0]:loc[1]], tag, "", 1)
-			return content[:loc[0]] + kept + content[loc[1]:]
-		}
 		tagIndex := strings.Index(portBlock, tag)
 		before := pyStrip(portBlock[:tagIndex])
-		after := pyStrip(portBlock[tagIndex+len(tag):])
-		block := strings.Join(newDecls, ",\n    ")
-		block = applyCommaContext(block, before, after)
-		newPortBlock := strings.Replace(portBlock, tag, block, 1)
+		afterRaw := portBlock[tagIndex+len(tag):]
+		// Idempotency: strip a `// Beginning … // End of automatics` block a
+		// previous run left right after the tag, so a re-run replaces it.
+		existingBlock := blockAfterTagRe.FindString(afterRaw)
+		// Manual ports after the tag; drop the leading separating comma so we can
+		// re-emit them on their own line below the block.
+		after := pyStrip(strings.TrimLeft(pyStrip(afterRaw[len(existingBlock):]), ","))
+
+		contentForSignals := strings.Replace(content, tag, "", 1)
+		if existingBlock != "" {
+			contentForSignals = strings.Replace(contentForSignals, existingBlock, "", 1)
+		}
+		insts := GetInstantiations(content)
+		newDecls := collectAutoDecls(contentForSignals, insts, direction, direction, false, proj)
+
+		head := portBlock[:tagIndex]
+		var newPortBlock string
+		if len(newDecls) == 0 {
+			// Nothing to add: bare tag, keep any trailing manual ports.
+			newPortBlock = head + tag
+			if after != "" {
+				newPortBlock += ", " + after
+			}
+		} else {
+			// Keep the tag and wrap the generated decls in the same Emacs
+			// `// Beginning … // End of automatics` markers the body form uses,
+			// so DeleteAll (autoSignalBlockRe) can reverse it. Trailing manual
+			// ports go on their own line so the End comment does not swallow them.
+			commentType := "inputs"
+			if direction != "input" {
+				commentType = "outputs"
+			}
+			decls := strings.Join(newDecls, ",\n    ")
+			decls = applyCommaContext(decls, before, "")
+			if after != "" && !strings.HasSuffix(pyRStrip(decls), ",") {
+				decls = pyRStrip(decls) + ","
+			}
+			newPortBlock = head + tag +
+				"\n    // Beginning of automatic " + commentType + "\n    " +
+				decls + "\n    // End of automatics"
+			if after != "" {
+				newPortBlock += "\n    " + after
+			}
+		}
 		header := pyRStrip(modStart)
 		if params != "" {
 			header += " " + pyStrip(params)

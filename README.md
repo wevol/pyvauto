@@ -11,13 +11,21 @@ A Python Verilog automation tool that brings Emacs `verilog-mode`-style AUTO exp
 
 ## Features
 
-- ✅ **Mixed-mode support**: every AUTO tag coexists with manual declarations — no duplicate definitions.
-- ✅ **AUTOINST**: auto-generates instance port connections (manual connections are detected and de-duplicated). Re-running **reconciles** against the sub-module's current ports — removed ports drop, new ports are added in-group, manual connections before the tag are kept, and bus widths are refreshed.
-- ✅ **AUTOARG**: maintains the module port list in both **ANSI (mixed-mode)** and **Non-ANSI** styles. The Non-ANSI list is regenerated on every run and grouped by direction under `// Outputs` / `// Inouts` / `// Inputs` headers, just like Emacs.
-- ✅ **AUTOINPUT / AUTOOUTPUT**: pulls undeclared input/output ports up from sub-instances and declares them.
-- ✅ **AUTOWIRE**: declares the `wire`s needed to interconnect instantiated modules.
-- ✅ **Stable replacement (idempotent)**: generated blocks are detected and replaced, so re-running never accumulates redundant tags or breaks syntax.
-- ✅ **Fast parsing**: a built-in regex-based Verilog parser handles the analysis and expansion.
+pyvauto implements a subset of Emacs `verilog-mode`'s AUTO tags. **Where a tag is supported, it behaves the same as Emacs verilog-mode** — the same expansion, the same mixed-mode handling (manual declarations coexist with AUTO tags, no duplicates), the same idempotent re-run (generated blocks are replaced, not accumulated), and the same direction grouping under `// Outputs` / `// Inouts` / `// Inputs`. The differences from Emacs are listed below.
+
+Supported tags:
+
+- **AUTOINST** — instance port connections; a re-run reconciles against the sub-module's current ports.
+- **AUTOARG** — module port list, in both ANSI (mixed-mode) and Non-ANSI styles.
+- **AUTOINPUT / AUTOOUTPUT** — propagate undeclared sub-instance ports up to the enclosing module.
+- **AUTOWIRE / AUTOLOGIC** — declare the `wire` / `logic` nets interconnecting sub-instances.
+- **AUTOSENSE** — fill `always @(/*AUTOSENSE*/...)` sensitivity lists.
+
+### Differences from Emacs verilog-mode
+
+- **No Emacs required.** pyvauto runs as a Vim plugin, a standalone CLI, or in CI. The core is pure Python (stdlib only, Python 3.6.8+); a byte-parity Go port lives in [`go/`](go/README.md).
+- **Subset of AUTO tags.** Only the tags listed above are implemented. Others (e.g. `AUTOPARAM`, `AUTOTIEOFF`, `AUTORESET`, SystemVerilog interfaces) are not — see [Status](#status).
+- **Regex-based parser, not a full parse.** Comments are stripped before analysis; ANSI vs Non-ANSI is decided by the `module … ( … ) ;` shape; instantiations are matched by the `ModName inst (...)` pattern (Verilog keywords are skipped). Unusual formatting a full parser would accept may not be recognised.
 
 ## Installation
 

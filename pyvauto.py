@@ -977,25 +977,57 @@ class VerilogExpander:
             mod_start, mod_name, params, port_block, tag = ansi_match.groups()
             print(f"Found {tag_name} in port list of {mod_name}")
 
+            tag_index = port_block.find(tag)
+            before = port_block[:tag_index].strip()
+            after_raw = port_block[tag_index + len(tag) :]
+            # Idempotency: a previous run leaves a `// Beginning … // End of
+            # automatics` block right after the tag. Strip it before recomputing
+            # so a re-run replaces the block instead of nesting a new one.
+            block_match = re.match(
+                r"\s*// Beginning of automatic \w+.*?// End of automatics",
+                after_raw,
+                re.DOTALL,
+            )
+            existing_block = block_match.group(0) if block_match else ""
+            # Manual ports written after the tag; drop the leading separating
+            # comma so we can re-emit them on their own line below the block.
+            after = after_raw[len(existing_block) :].strip().lstrip(",").strip()
+
+            content_for_signals = content.replace(tag, "")
+            if existing_block:
+                content_for_signals = content_for_signals.replace(existing_block, "")
+
             insts = self.project.parser.get_instantiations(content, file_path)
             new_decls = self._collect_auto_decls(
-                content.replace(tag, ""), insts, direction, direction,
+                content_for_signals, insts, direction, direction,
                 semicolon=False, check_manual_widths=True,
             )
 
+            head = port_block[:tag_index]
             if not new_decls:
-                return self._splice(
-                    content, ansi_match, ansi_match.group(0).replace(tag, "")
-                )
+                # Nothing to add: bare tag, keep any trailing manual ports.
+                new_port_block = f"{head}{tag}" + (f", {after}" if after else "")
+            else:
+                # Keep the tag and wrap the generated decls in the same Emacs
+                # `// Beginning … // End of automatics` markers the body form
+                # uses, so `--delete` (_AUTO_SIGNAL_BLOCK_RE) can reverse it.
+                # Trailing manual ports go on their own line so the End-of-
+                # automatics comment does not swallow them.
+                comment_type = "inputs" if direction == "input" else "outputs"
+                decls = ",\n    ".join(new_decls)
+                decls = self._apply_comma_context(decls, before, "")
+                if after and not decls.rstrip().endswith(","):
+                    decls = decls.rstrip() + ","
+                lines = [
+                    tag,
+                    f"    // Beginning of automatic {comment_type}",
+                    f"    {decls}",
+                    "    // End of automatics",
+                ]
+                if after:
+                    lines.append(f"    {after}")
+                new_port_block = head + "\n".join(lines)
 
-            tag_index = port_block.find(tag)
-            before = port_block[:tag_index].strip()
-            after = port_block[tag_index + len(tag) :].strip()
-
-            block = ",\n    ".join(new_decls)
-            block = self._apply_comma_context(block, before, after)
-
-            new_port_block = port_block.replace(tag, block)
             header = mod_start.rstrip()
             if params:
                 header += " " + params.strip()
@@ -1179,15 +1211,15 @@ class VerilogExpander:
     def delete_module_block(self, content: str, file_path: str) -> str:
         """Reverse every AUTO expansion within a single module block."""
         content = self._delete_autoinst(content)
-        # body-form AUTOWIRE/AUTOLOGIC/AUTOINPUT/AUTOOUTPUT: drop the
-        # // Beginning … // End block, keep the bare tag. The block's presence is
-        # itself proof of a real expansion, so commented-out tags (which have no
-        # such block) are left alone — no masking needed here.
+        # AUTOWIRE/AUTOLOGIC/AUTOINPUT/AUTOOUTPUT — both body form and ANSI
+        # header form keep the tag and wrap decls in a // Beginning … // End
+        # block, so a single sub drops the block and restores the bare tag. The
+        # block's presence is itself proof of a real expansion, so commented-out
+        # tags (which have no such block) are left alone — no masking needed here.
         content = _AUTO_SIGNAL_BLOCK_RE.sub(lambda m: m.group(1), content)
         content = self._delete_autosense(content)
-        # AUTOARG keeps its tag after expansion (reversible). ANSI AUTOINPUT/
-        # AUTOOUTPUT replace the tag with port decls (tag is gone), so only their
-        # body form is reversible — handled by the block sub above.
+        # AUTOARG keeps its tag after expansion, so its header list is un-expanded
+        # here (the block sub above only touches the marker-wrapped forms).
         content = self._delete_header_tag(content, "AUTOARG")
         return content
 

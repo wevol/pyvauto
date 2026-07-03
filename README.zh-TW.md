@@ -11,13 +11,21 @@ Python 版本的 Verilog 自動化工具，提供類似 Emacs `verilog-mode` 的
 
 ## 功能特點
 
-- ✅ **混合模式支援**: 所有自動化標籤皆支援與手動宣告混合並存，不會產生重複定義。
-- ✅ **AUTOINST**: 自動產生模組實例化的埠口連接（與手動連線自動去重）。重跑時會**對比子模組當前的埠口做增減**——刪掉的埠口消失、新增的埠口進對應分組、tag 前的手動連線保留、既有連線的匯流排寬度會刷新。
-- ✅ **AUTOARG**: 自動維護模組埠口列表，支援 **ANSI (混合模式)** 與 **Non-ANSI** 風格。Non-ANSI 清單每次執行都會重新產生，並依方向分組於 `// Outputs` / `// Inouts` / `// Inputs` 標頭之下，與 Emacs 相同。
-- ✅ **AUTOINPUT / AUTOOUTPUT**: 自動從子模組中提取並宣告未定義的輸入/輸出埠口。
-- ✅ **AUTOWIRE**: 自動建立實例化模組間互連所需的 `wire` 宣告。
-- ✅ **智慧替換**: 產生的區塊具備穩定性，重複執行不會產生冗餘標籤或語法錯誤。
-- ✅ **高效解析**: 內建高效 Python Regex 解析器，支援精確的語法分析與自動化擴展。
+pyvauto 實作了 Emacs `verilog-mode` AUTO tag 的一個子集。**有支援的 tag，行為與 Emacs verilog-mode 相同**——相同的展開結果、相同的混合模式處理（手動宣告與 AUTO tag 並存、不重複）、相同的冪等重跑（產生的區塊會被替換而非累加），以及相同的 `// Outputs` / `// Inouts` / `// Inputs` 方向分組。與 Emacs 的差異列於下方。
+
+支援的 tag：
+
+- **AUTOINST** —— 模組實例化的埠口連接；重跑時會對比子模組當前的埠口做增減。
+- **AUTOARG** —— 模組埠口列表，支援 ANSI（混合模式）與 Non-ANSI 兩種風格。
+- **AUTOINPUT / AUTOOUTPUT** —— 把子模組中未宣告的埠口往上傳遞到外層模組。
+- **AUTOWIRE / AUTOLOGIC** —— 宣告互連子模組所需的 `wire` / `logic`。
+- **AUTOSENSE** —— 填入 `always @(/*AUTOSENSE*/...)` 的敏感列表。
+
+### 與 Emacs verilog-mode 的差異
+
+- **不需要 Emacs。** pyvauto 可作為 Vim 插件、獨立 CLI，或接進 CI 執行。本體是純 Python（僅標準庫，相容 Python 3.6.8+）；另有一份 byte 級對拍的 Go port 位於 [`go/`](go/README.md)。
+- **只支援部分 AUTO tag。** 僅實作上列的 tag，其餘（如 `AUTOPARAM`、`AUTOTIEOFF`、`AUTORESET`、SystemVerilog interface）尚未支援——見 [開發狀態](#開發狀態)。
+- **以 Regex 解析，非完整語法解析。** 分析前會先移除註解；以 `module … ( … ) ;` 的形狀判斷 ANSI / Non-ANSI；以 `ModName inst (...)` 樣式辨識實例化（Verilog 關鍵字會被跳過）。完整解析器能接受的特殊寫法，pyvauto 可能無法辨識。
 
 ## 安裝
 

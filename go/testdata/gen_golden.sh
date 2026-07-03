@@ -13,6 +13,18 @@ for in in "$here/inputs"/*.sv; do
   rm -rf "$work"
 done
 
+# Delete goldens: un-expand each expanded golden that has a .del.golden, so the
+# delete round-trip fixtures stay oracle-derived alongside the expand goldens.
+for del in "$here/golden"/*.del.golden; do
+  [ -e "$del" ] || continue
+  name="$(basename "$del" .del.golden)"
+  work="$(mktemp -d)"
+  cp "$here/golden/$name.golden" "$work/$name.sv"
+  ( cd "$work" && python3 "$repo/pyvauto.py" --delete "$name.sv" >/dev/null 2>&1 )
+  cp "$work/$name.sv" "$del"
+  rm -rf "$work"
+done
+
 # Full corpus: the real tests/*.sv fixtures. Some reference sub-modules in
 # OTHER fixtures, so run Python with the whole corpus present.
 corpus="$(mktemp -d)"

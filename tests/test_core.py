@@ -1284,19 +1284,33 @@ endmodule
         assert "output [7:0] data_o;" not in deleted
         assert deleted == bare
 
-    def test_ansi_autoinput_output_not_reversible(self):
-        """Known limitation: for ANSI port-list AUTOINPUT/AUTOOUTPUT, the tag is
-        replaced by port declarations on expand (the tag disappears), so it is
-        irreversible. Only the body form can be un-expanded."""
+    def test_ansi_autoinput_output_round_trip(self):
+        """ANSI port-list AUTOINPUT/AUTOOUTPUT is reversible: expansion keeps the
+        tag and wraps the generated ports in the same // Beginning … // End of
+        automatics markers the body form (and Emacs) use, so delete_all can strip
+        them back to the bare tag and a re-expand reproduces the same output."""
         expander = self._expander_with_sub()
         bare = """module top (/*AUTOOUTPUT*/);
     sub u (.clk(clk), .data_i(data_i), .data_o(data_o));
 endmodule
 """
         expanded = expander.expand_all(bare, "top.sv")
-        assert "/*AUTOOUTPUT*/" not in expanded  # expansion drops the tag (destructive)
-        # no tag to anchor on -> delete_all leaves it unchanged, not deleting these port declarations
-        assert expander.delete_all(expanded, "top.sv") == expanded
+        # Expansion keeps the tag and emits a reversible marker block.
+        assert "/*AUTOOUTPUT*/" in expanded
+        assert "// Beginning of automatic outputs" in expanded
+        assert "// End of automatics" in expanded
+        assert "output [7:0] data_o" in expanded
+
+        deleted = expander.delete_all(expanded, "top.sv")
+        # Un-expand restores the bare tag and drops the generated ports/markers.
+        assert "/*AUTOOUTPUT*/" in deleted
+        assert "// Beginning of automatic outputs" not in deleted
+        assert "output [7:0] data_o" not in deleted
+
+        # The restored bare form re-expands to exactly the same output (idempotent
+        # round-trip), and expanding twice is a no-op.
+        assert expander.expand_all(deleted, "top.sv") == expanded
+        assert expander.expand_all(expanded, "top.sv") == expanded
 
     def test_delete_all_round_trip_multiple_tags(self):
         expander = self._expander_with_sub()
