@@ -370,8 +370,12 @@ class VerilogProject:
 
     def add_directory(self, path: str):
         print(f"Indexing directory: {os.path.abspath(path)}")
-        for root, _, files in os.walk(path):
-            for file in files:
+        # Sorted traversal: os.walk order is filesystem-dependent, and with
+        # duplicate module names "first-found wins" — keep it deterministic
+        # (and matching the Go port's lexical WalkDir) on every platform.
+        for root, dirs, files in os.walk(path):
+            dirs.sort()
+            for file in sorted(files):
                 if file.endswith((".v", ".sv")) and file != "test_top.sv":
                     self._index_file(os.path.join(root, file))
 
@@ -397,9 +401,12 @@ class VerilogProject:
         # One cheap directory listing per root — file names only, no parsing.
         candidates = []                  # all candidate .v/.sv paths
         by_basename = {}                 # '<name>' -> path, for the fast-path
+        # Sorted traversal: see add_directory — first-found-wins resolution must
+        # not depend on filesystem listing order.
         for path in uniq_roots:
-            for root, _, files in os.walk(path):
-                for file in files:
+            for root, dirs, files in os.walk(path):
+                dirs.sort()
+                for file in sorted(files):
                     if file.endswith((".v", ".sv")) and file != "test_top.sv":
                         full = os.path.join(root, file)
                         candidates.append(full)
