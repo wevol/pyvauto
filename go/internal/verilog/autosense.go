@@ -45,35 +45,32 @@ func extractAlwaysBlockBody(content string, startPos int) string {
 	return body
 }
 
-// signalIsRead ports _signal_is_read.
-func signalIsRead(name, cleanBody string) bool {
-	re := regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`)
-	for _, m := range re.FindAllStringIndex(cleanBody, -1) {
-		suffix := pyLStrip(cleanBody[m[1]:])
-		if strings.HasPrefix(suffix, "[") {
-			stack := 0
-			skip := 0
-			for i := 0; i < len(suffix); i++ {
-				switch suffix[i] {
-				case '[':
-					stack++
-				case ']':
-					stack--
-				}
-				skip = i + 1
-				if stack == 0 {
-					break
-				}
+// signalIsReadAt ports _signal_is_read, applied to one identifier occurrence:
+// reports whether the identifier ending at pos is read (not an assignment
+// target). The caller supplies occurrences from its own identifier scan, so no
+// per-signal regex is needed.
+func signalIsReadAt(cleanBody string, pos int) bool {
+	suffix := pyLStrip(cleanBody[pos:])
+	if strings.HasPrefix(suffix, "[") {
+		stack := 0
+		skip := 0
+		for i := 0; i < len(suffix); i++ {
+			switch suffix[i] {
+			case '[':
+				stack++
+			case ']':
+				stack--
 			}
-			suffix = pyLStrip(suffix[skip:])
+			skip = i + 1
+			if stack == 0 {
+				break
+			}
 		}
-		isBlocking := strings.HasPrefix(suffix, "=") && !strings.HasPrefix(suffix, "==")
-		isNonBlocking := strings.HasPrefix(suffix, "<=") && !strings.HasPrefix(suffix, "<==")
-		if !(isBlocking || isNonBlocking) {
-			return true
-		}
+		suffix = pyLStrip(suffix[skip:])
 	}
-	return false
+	isBlocking := strings.HasPrefix(suffix, "=") && !strings.HasPrefix(suffix, "==")
+	isNonBlocking := strings.HasPrefix(suffix, "<=") && !strings.HasPrefix(suffix, "<==")
+	return !(isBlocking || isNonBlocking)
 }
 
 // ExpandAutosense ports expand_autosense: fill always @(/*AUTOSENSE*/...) with
@@ -93,9 +90,9 @@ func ExpandAutosense(content, filePath string, proj *Project) string {
 
 		cleanBody := StripComments(extractAlwaysBlockBody(content, loc[1]))
 		detected := map[string]bool{}
-		for _, m := range identifierScanRe.FindAllStringSubmatch(cleanBody, -1) {
-			name := m[1]
-			if localSignals[name] && !autosenseKeywords[name] && signalIsRead(name, cleanBody) {
+		for _, m := range identifierScanRe.FindAllStringSubmatchIndex(cleanBody, -1) {
+			name := cleanBody[m[2]:m[3]]
+			if !detected[name] && localSignals[name] && !autosenseKeywords[name] && signalIsReadAt(cleanBody, m[3]) {
 				detected[name] = true
 			}
 		}

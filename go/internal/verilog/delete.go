@@ -6,8 +6,6 @@ import (
 )
 
 var autoSignalBlockRe = regexp.MustCompile(`(?is)(/\*(?:AUTOWIRE|AUTOLOGIC|AUTOINPUT|AUTOOUTPUT)\*/)\s*// Beginning.*?// End of automatics`)
-var deleteAutoinstRe = regexp.MustCompile(`(?is)(\w+)\s+(\w+)\s*(#\s*\(.*?\))?\s*\(([^;]*?(/\*AUTOINST\*/)[^;]*?)\)\s*;`)
-var deleteAutosenseRe = regexp.MustCompile(`(?is)(always\s*@\s*)\(([^)]*/\*AUTOSENSE\*/[^)]*)\)`)
 
 // DeleteAll ports delete_all: per module block, reverse every AUTO expansion,
 // leaving the bare tags.
@@ -23,7 +21,7 @@ func DeleteAll(content, filePath string) string {
 
 // deleteAutoinst ports _delete_autoinst.
 func deleteAutoinst(content string) string {
-	locs := deleteAutoinstRe.FindAllStringSubmatchIndex(content, -1)
+	locs := autoinstRe.FindAllStringSubmatchIndex(content, -1)
 	if locs == nil {
 		return content
 	}
@@ -56,7 +54,7 @@ func deleteAutoinst(content string) string {
 
 // deleteAutosense ports _delete_autosense.
 func deleteAutosense(content string) string {
-	locs := deleteAutosenseRe.FindAllStringSubmatchIndex(content, -1)
+	locs := autosenseRe.FindAllStringSubmatchIndex(content, -1)
 	if locs == nil {
 		return content
 	}
