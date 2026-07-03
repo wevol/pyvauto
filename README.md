@@ -3,8 +3,11 @@
 **English** | [繁體中文](README.zh-TW.md)
 
 [![CI](https://github.com/wevol/pyvauto/actions/workflows/ci.yml/badge.svg)](https://github.com/wevol/pyvauto/actions/workflows/ci.yml)
+[![Go](https://github.com/wevol/pyvauto/actions/workflows/go.yml/badge.svg)](https://github.com/wevol/pyvauto/actions/workflows/go.yml)
 
 A Python Verilog automation tool that brings Emacs `verilog-mode`-style AUTO expansion to your editor. pyvauto is **built for Vim** (a Vim plugin is included): you get one-keystroke AUTOINST / AUTOARG / AUTOWIRE expansion without depending on Emacs. The core is a pure-Python CLI, so it also runs standalone from the command line or in CI. Other editors (e.g. VS Code) have no dedicated plugin yet — there you invoke the CLI from a terminal and reload the file.
+
+> **Two implementations.** The reference implementation is the pure-Python `pyvauto.py` (this document). A standalone **Go** port lives in [`go/`](go/README.md) — a single self-contained binary with no Python runtime, matched **byte-for-byte** against the Python output via golden tests over the `tests/*.sv` corpus (a CI job regenerates the goldens from Python and fails if the two drift apart). Point the Vim plugin at the binary with `let g:pyvauto_bin = '/path/to/go/pyvauto'`. Both share the same `tests/*.sv` fixtures.
 
 ## Features
 

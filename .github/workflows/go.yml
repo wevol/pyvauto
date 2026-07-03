@@ -1,0 +1,54 @@
+name: Go
+
+# Path-filtered: only runs when the Go code, the shared fixtures, or the Python
+# oracle change (the parity job compares Go output against Python).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'go/**'
+      - 'tests/**'
+      - 'pyvauto.py'
+      - '.github/workflows/go.yml'
+  pull_request:
+    paths:
+      - 'go/**'
+      - 'tests/**'
+      - 'pyvauto.py'
+      - '.github/workflows/go.yml'
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: false
+      - name: Vet & test
+        working-directory: go
+        run: |
+          go vet ./...
+          go test ./...
+
+  parity:
+    # Regenerate the goldens from the Python reference, then confirm the Go
+    # output still matches — catches the two implementations drifting apart.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: false
+      - name: Sync Python deps
+        run: uv sync
+      - name: Regenerate goldens from the Python oracle
+        run: bash go/testdata/gen_golden.sh
+      - name: Go must match the freshly generated goldens
+        working-directory: go
+        run: go test ./internal/verilog/ -run 'Golden|Corpus'
