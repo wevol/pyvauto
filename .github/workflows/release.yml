@@ -8,14 +8,100 @@ permissions:
   contents: write
 
 jobs:
+  # Fast fail: the pushed tag must match the version in pyproject.toml, so a
+  # release can't ship with a stale version string.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match pyproject version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          proj="$(grep -m1 '^version' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          if [ "$tag" != "$proj" ]; then
+            echo "::error::tag v$tag does not match pyproject version $proj"
+            exit 1
+          fi
+          echo "tag and pyproject agree on $proj"
+
+  # Don't release a red commit: run the same Python + Go suites CI runs.
+  test:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: false
+      - name: Install Vim (for plugin integration tests)
+        run: sudo apt-get update && sudo apt-get install -y vim
+      - name: Python tests
+        run: |
+          uv sync
+          uv run --with pytest python -m pytest tests/ -q
+      - name: Go tests
+        working-directory: go
+        run: |
+          go vet ./...
+          go test ./...
+
+  # Cross-compile the Go port for the common platforms.
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64 }
+          - { goos: linux,   goarch: arm64 }
+          - { goos: darwin,  goarch: amd64 }
+          - { goos: darwin,  goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: false
+      - name: Build
+        working-directory: go
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          ext=""
+          [ "$GOOS" = "windows" ] && ext=".exe"
+          go build -trimpath -ldflags="-s -w" \
+            -o "../pyvauto-${GOOS}-${GOARCH}${ext}" ./cmd/pyvauto
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: pyvauto-*
+
+  # Only after tests pass and every binary built: cut the release, attaching
+  # the prebuilt binaries plus the zero-dependency standalone script.
   release:
+    needs: [test, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history so release notes can diff from the last tag
-
+          fetch-depth: 0  # full history so --generate-notes can diff from the last tag
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bin-*
+          path: dist
+          merge-multiple: true
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/pyvauto-* pyvauto.py
