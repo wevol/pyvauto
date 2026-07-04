@@ -1,200 +1,134 @@
 # Vim Integration Guide
 
-## The problem it solves
+The bundled plugin lets you expand AUTO tags from inside Vim with one keystroke.
+It works even if your Vim was built with **only Python 2.7** (or no Python at
+all): instead of running Python inside Vim, the plugin shells out to your
+system's Python 3 to run `pyvauto.py`. Zero dependencies, and it runs the same
+on Linux, macOS, and Windows.
 
-If your Vim was built with only Python 2.7 support and can't run Python 3 code
-directly, this project ships an **external-command approach**: Vim shells out to
-your system's Python 3 to run `pyvauto.py`.
+## Quick start
 
----
+1. Make sure Python 3.6.8+ is on your `PATH` (`python3 --version`).
+2. Add the project to Vim's `runtimepath`:
+   ```vim
+   " in your .vimrc
+   set runtimepath+=/path/to/pyvauto
+   ```
+3. Open a `.v`/`.sv` file, put an AUTO tag (e.g. `/*AUTOINST*/`) where you want
+   it, and press **`F5`** (or `\va`). The plugin saves the buffer, runs the
+   expansion, and reloads the file in place.
 
-## Python version support
+That's it — no configuration needed in the common case, because the plugin
+auto-detects both your Python 3 executable and the path to `pyvauto.py`.
 
-`pyvauto.py` runs on:
-- ✅ Python 3.6.8+
-- ✅ Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
+## Commands & key mappings
 
-**Compatibility notes:**
-- Uses `typing.Optional` instead of the `|` union operator.
-- Uses `typing.List` / `typing.Set` for return-type hints.
-- Relies only on standard-library features available since Python 3.6.
+In a Verilog/SystemVerilog buffer:
 
-> The standalone tool targets 3.6.8+. The project's own dev/test environment
-> (uv + pytest) targets Python 3.13 — see the main README.
+| Action | Mapping | Ex command |
+|--------|---------|------------|
+| Expand AUTO tags | `\va` or `F5` | `:Pyvauto` (or `:VA`) |
+| Un-expand (strip generated content, keep the bare tags) | `\nva` or `F6` | `:NVA` |
 
----
+`\` is Vim's default `<Leader>`, so `\va` means leader-then-`va`. To use your own
+mappings, disable the defaults and bind the commands yourself:
+
+```vim
+let g:pyvauto_no_mappings = 1
+nnoremap <silent> <Leader>e :Pyvauto<CR>
+nnoremap <silent> <F9>      :NVA<CR>
+```
+
+## Configuration
+
+All settings are optional. Put any you need in your `.vimrc`.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `g:pyvauto_python` | auto-detected: `python3` → `python` → `py` (skips the Windows Store stub) | The Python 3 executable. Set only if detection picks the wrong one. |
+| `g:pyvauto_script` | auto-located: next to `pyvauto.vim`, else one directory up | Path to `pyvauto.py`. `~` and `$ENV` vars are expanded for you. Set if you installed the script elsewhere. |
+| `g:pyvauto_bin` | unset | Path to a compiled binary (e.g. the [Go build](go/README.md)). When set, it runs directly — **no Python or `pyvauto.py` needed**. |
+| `g:pyvauto_on_save` | off | Set to `1` to expand automatically on every `:w` of a `.v`/`.sv` file. |
+| `g:pyvauto_no_mappings` | off | Set to `1` to disable the default `\va`/`F5` and `\nva`/`F6` mappings. |
+
+```vim
+" examples
+let g:pyvauto_python  = 'python3'
+let g:pyvauto_script  = '~/.vim/plugin/pyvauto.py'
+let g:pyvauto_bin     = '/path/to/pyvauto/go/pyvauto'   " use the Go binary
+let g:pyvauto_on_save = 1
+```
 
 ## Installation
 
-### 1. Confirm Python 3 is available
+The `runtimepath` method in [Quick start](#quick-start) is the simplest. If you
+prefer to copy files into your plugin directory instead, **copy `pyvauto.py`
+alongside `pyvauto.vim`** so the plugin can find the script automatically:
 
 ```bash
-python --version    # should report Python 3.6.8 or newer
-# if the above is Python 2.x, try:
-python3 --version
-```
-
-### 2. Install the Vim plugin
-
-Add the project directory to Vim's `runtimepath`:
-
-```vim
-" in your .vimrc
-set runtimepath+=/path/to/pyvauto
-```
-
-Or copy the files manually. **Copy `pyvauto.py` alongside `pyvauto.vim`** — the
-plugin auto-detects the script in its own directory, so no `g:pyvauto_script` is
-needed:
-
-```bash
-# Linux/macOS
+# Linux / macOS
 cp plugin/pyvauto.vim pyvauto.py ~/.vim/plugin/
 
 # Windows
 copy plugin\pyvauto.vim %USERPROFILE%\vimfiles\plugin\
-copy pyvauto.py        %USERPROFILE%\vimfiles\plugin\
+copy pyvauto.py         %USERPROFILE%\vimfiles\plugin\
 ```
 
-> Script path resolution: the plugin first looks for `pyvauto.py` **next to**
-> `pyvauto.vim` (flat install above), then falls back to the parent directory
-> (the repo layout, where `pyvauto.vim` lives in `plugin/` and `pyvauto.py` sits
-> one level up). If you copy *only* `pyvauto.vim` into `~/.vim/plugin/` without
-> `pyvauto.py`, set `g:pyvauto_script` explicitly.
+### How the script path is resolved
 
-### 3. Configuration (optional)
+The plugin looks for `pyvauto.py` in two places, first match wins:
 
-Customize in your `.vimrc`:
+1. **Next to `pyvauto.vim`** — the flat install above.
+2. **One directory up** — the repo layout, where `pyvauto.vim` lives in
+   `plugin/` and `pyvauto.py` sits at the project root.
 
-```vim
-" if your Python 3 executable isn't 'python' (e.g. it's 'python3')
-let g:pyvauto_python = 'python3'
-
-" if pyvauto.py needs an explicit path (~ and $ENV vars are expanded for you)
-let g:pyvauto_script = '~/.vim/plugin/pyvauto.py'
-
-" expand automatically on save (optional)
-let g:pyvauto_on_save = 1
-
-" disable the default mappings (if you want your own)
-let g:pyvauto_no_mappings = 1
-```
-
----
-
-## Usage
-
-### Option 1: key mappings
-
-In a Verilog file (`.v` or `.sv`):
-
-- expand: press **`\va`** (backslash + va) or **`F5`**
-- un-expand (strip auto-generated content): press **`\nva`** or **`F6`**
-
-### Option 2: command
-
-Type these after the `:` in normal mode (they're Ex commands):
-
-```vim
-:VA         " expand (alias: :Pyvauto)
-:NVA        " un-expand — remove auto-generated content, keep the bare tags
-```
-
-### Workflow
-
-1. Add an AUTO tag (e.g. `/*AUTOINST*/`) in your Verilog file.
-2. Press `\va` or `F5`.
-3. The plugin will:
-   - save the current file
-   - call the external Python 3 to run `pyvauto.py`
-   - reload the file automatically
-   - show a result message
-
----
-
-## Custom key mappings
-
-To use a different shortcut:
-
-```vim
-" disable the default mappings
-let g:pyvauto_no_mappings = 1
-
-" map to <Leader>e (e.g. \e)
-nnoremap <silent> <Leader>e :Pyvauto<CR>
-
-" or use another function key
-nnoremap <silent> <F9> :Pyvauto<CR>
-```
-
----
+If you copy *only* `pyvauto.vim` (without `pyvauto.py`), set `g:pyvauto_script`
+to the script's location.
 
 ## Troubleshooting
 
-### Error: Python not found
+**"Python not found"** — detection couldn't find a usable interpreter. Point it
+at one explicitly:
 
 ```vim
-" specify the full path to the Python executable
-let g:pyvauto_python = '/usr/bin/python3'   " or e.g. C:/Python313/python.exe on Windows
+let g:pyvauto_python = '/usr/bin/python3'      " Windows, e.g. C:/Python313/python.exe
 ```
 
-### Error: pyvauto.py not found
+**"pyvauto.py not found"** — set an absolute path to the script:
 
 ```vim
-" use an absolute path
 let g:pyvauto_script = '/path/to/pyvauto/pyvauto.py'
 ```
 
-### Error: `python3: can't open file '~/.vim/plugin/pyvauto.py'`
-
-A `~` (or `$HOME`) in the path that reaches Python *literally*. The plugin
-quotes `g:pyvauto_script` with `shellescape()` before calling Python, and the
-quoting stops the shell from expanding `~` — Python then can't find the path.
-
-Fixed since this version: the plugin runs `expand(g:pyvauto_script)` on load, so
-`~` and `$ENV` vars are resolved to an absolute path regardless of how you set
-it. If you still see this, you're on an old `pyvauto.vim` — update the plugin,
-or set an already-absolute path yourself:
+**`python3: can't open file '~/.vim/plugin/pyvauto.py'`** — a literal `~` reached
+Python. The plugin expands `~`/`$ENV` on load, so a current `pyvauto.vim` handles
+this for you. If you still hit it on an older plugin, expand the path yourself:
 
 ```vim
 let g:pyvauto_script = expand('~/.vim/plugin/pyvauto.py')
 ```
 
-### Check the configuration
-
-Run inside Vim:
+**Check what's configured** — run inside Vim:
 
 ```vim
 :echo g:pyvauto_python
 :echo g:pyvauto_script
 ```
 
-to confirm the paths are correct.
+## Python compatibility
 
----
+`pyvauto.py` targets **Python 3.6.8+** (tested through 3.13). It uses
+`typing.Optional`/`List`/`Set` rather than the newer `|` union syntax and relies
+only on the standard library, so an old system Python is fine.
 
-## Why this approach
+> This is about the *standalone tool's* runtime. The project's own dev/test
+> environment (uv + pytest) targets Python 3.13 — see the main
+> [README](README.md).
 
-✅ **Bypasses Vim's Python version limit** — uses the system Python 3
-✅ **Zero dependencies** — no third-party packages required
-✅ **Cross-platform** — works on Windows, Linux, and macOS
-✅ **Backward compatible** — supports Python 3.6.8+
-✅ **Simple integration** — one keystroke runs every expansion
-
----
-
-## Testing
-
-Run the test suite to confirm everything works:
+## Verifying your setup
 
 ```bash
 cd /path/to/pyvauto
-
-# run the tests
-python -m pytest tests/ -v
-
-# manual test
-python pyvauto.py tests/test_top.sv
+python -m pytest tests/ -v            # run the test suite
+python pyvauto.py tests/test_top.sv   # or expand a sample file by hand
 ```
-
-All tests should pass.
