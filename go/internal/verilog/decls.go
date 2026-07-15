@@ -5,8 +5,10 @@ import (
 	"strings"
 )
 
-// typeDeclRe ports _TYPE_DECL_RE.
-var typeDeclRe = regexp.MustCompile(`\b(wire|reg|logic|integer|bit|real|byte|shortint|int|longint)\b\s+(\[.*?\]\s+)?([\w\s,]+);`)
+// typeDeclRe ports _TYPE_DECL_RE. `\b…\b\s*` (and `\s*` after the width)
+// tolerate the no-space forms `wire[7:0] a;` / `reg[3:0] b;`; the `\b` after the
+// keyword still rejects identifiers such as `wireless` / `regfile`.
+var typeDeclRe = regexp.MustCompile(`\b(wire|reg|logic|integer|bit|real|byte|shortint|int|longint)\b\s*(\[.*?\]\s*)?([\w\s,]+);`)
 
 // scanTypeDecls ports _scan_type_decls: {signal name: width} for wire/reg/logic
 // declarations.

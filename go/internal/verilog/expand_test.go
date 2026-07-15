@@ -62,6 +62,7 @@ func expandGolden(t *testing.T, name string) {
 	}
 }
 
+func TestAutoargNospaceGolden(t *testing.T) { expandGolden(t, "autoarg_nospace") }
 func TestAutoinstGolden(t *testing.T)       { expandGolden(t, "autoinst_basic") }
 func TestAutoinstWidthGolden(t *testing.T)  { expandGolden(t, "autoinst_width") }
 func TestAutoinputBodyGolden(t *testing.T)  { expandGolden(t, "autoinput_body") }

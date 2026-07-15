@@ -263,6 +263,61 @@ class TestVerilogExpander:
         )
         assert result.index("done") < result.index("bus") < result.index("clk")
 
+    def test_autoarg_handles_no_space_before_bracket(self):
+        """`input[7:0] x` / `output[3:0] y` (no space before the bus width) are
+        parsed like their spaced forms; `inputxyz` is not mistaken for a port."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m (/*AUTOARG*/);
+            input        clk;
+            input[7:0]   data_in;
+            output[3:0]  data_out;
+            wire         inputxyz;
+        endmodule
+        """
+        result = expander.expand_autoarg(content, "m.sv")
+        assert "data_in" in result
+        assert "data_out" in result
+        assert "clk" in result
+        # the wire named `inputxyz` must not leak into the port list
+        assert "inputxyz" not in result[: result.index("endmodule")].split(");")[0]
+
+    def test_autoarg_handles_no_space_before_bracket_with_type(self):
+        """A no-space type keyword — `input wire[7:0] x` / `output reg[3:0] y` —
+        is parsed as type+width, not as a port named `wire`/`reg`. Identifiers
+        such as `regfile` are not split on the `reg` prefix."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = """
+        module m (/*AUTOARG*/);
+            input  wire[7:0] w_in;
+            output reg[3:0]  r_out;
+            wire regfile;
+        endmodule
+        """
+        result = expander.expand_autoarg(content, "m.sv")
+        header = result[: result.index(");")]
+        assert "w_in" in header and "r_out" in header
+        # the type keywords must not appear as port names
+        assert "wire" not in header and "reg" not in header
+
+    def test_autosense_detects_no_space_typed_signals(self):
+        """Standalone `wire[7:0] a;` / `reg[3:0] b;` (no space before the width)
+        are recognised as local signals, so AUTOSENSE lists them."""
+        project = VerilogProject()
+        expander = VerilogExpander(project)
+        content = (
+            "module m (input clk, output reg q);\n"
+            "    wire[7:0] a;\n"
+            "    reg[3:0] b;\n"
+            "    always @(/*AUTOSENSE*/) q = a[0] & b[0];\n"
+            "endmodule\n"
+        )
+        result = expander.expand_all(content, "m.sv")
+        assert "a" in result.split("/*AUTOSENSE*/")[1].split(")")[0]
+        assert "b" in result.split("/*AUTOSENSE*/")[1].split(")")[0]
+
     def test_autoarg_grouped_delete_round_trip(self):
         """Expand (producing grouped comments) then delete returns to a bare
         tag, keeping the manual name before the tag."""

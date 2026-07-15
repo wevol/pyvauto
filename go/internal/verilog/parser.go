@@ -29,7 +29,10 @@ var endmoduleRe = regexp.MustCompile(`\bendmodule\b`)
 // optional type, an optional bus width, and the FIRST name. RE2 has no
 // lookahead, so the trailing comma-separated names sharing this declaration are
 // collected by hand (see parsePortsFrom) instead of in the regex.
-var portHeadRe = regexp.MustCompile(`(input|output|inout)\s+(?:(logic|reg|wire)\s+)?(?:(\[[^\]]*\])\s+)?(\w+)`)
+// `\b\s*` after the direction and after the type keyword (and `\s*` after the
+// width) tolerate the no-space forms `input[7:0] x` and `input wire[7:0] x`; the
+// `\b`s still reject identifiers such as `inputxyz` / `wireless`.
+var portHeadRe = regexp.MustCompile(`(input|output|inout)\b\s*(?:(logic|reg|wire)\b\s*)?(?:(\[[^\]]*\])\s*)?(\w+)`)
 
 // contNameRe matches ", <name>" continuing a shared-direction port declaration.
 var contNameRe = regexp.MustCompile(`^\s*,\s*(\w+)`)

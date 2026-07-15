@@ -72,8 +72,11 @@ _AUTO_TAG_RE = re.compile(
 )
 
 
+# `\b…\b\s*` (and `\s*` after the width) tolerate the no-space forms
+# `wire[7:0] a;` / `reg[3:0] b;`; the `\b` after the keyword still rejects
+# identifiers such as `wireless` / `regfile`.
 _TYPE_DECL_RE = re.compile(
-    r"\b(wire|reg|logic|integer|bit|real|byte|shortint|int|longint)\b\s+(\[.*?\]\s+)?([\w\s,]+);",
+    r"\b(wire|reg|logic|integer|bit|real|byte|shortint|int|longint)\b\s*(\[.*?\]\s*)?([\w\s,]+);",
     re.MULTILINE,
 )
 
@@ -212,8 +215,12 @@ class RegexVerilogParser:
         # lookahead stops the list at the next declaration so an ANSI header
         # like `input a, input b` is NOT merged into one port. Split group(4)
         # with `_port_names` to get the individual names.
+        # `\b\s*` after the direction and after the type keyword (and `\s*`
+        # after the width) tolerate the no-space forms `input[7:0] x` and
+        # `input wire[7:0] x`; the `\b`s still reject identifiers such as
+        # `inputxyz` / `wireless`.
         self.port_re = re.compile(
-            r"(input|output|inout)\s+(?:(logic|reg|wire)\s+)?(?:(\[.*?\])\s+)?"
+            r"(input|output|inout)\b\s*(?:(logic|reg|wire)\b\s*)?(?:(\[.*?\])\s*)?"
             r"(\w+(?:\s*,\s*(?!input\b|output\b|inout\b)\w+)*)",
             re.MULTILINE,
         )
