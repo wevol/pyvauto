@@ -1098,7 +1098,6 @@ class VerilogExpander:
 
         def replace_fn(match):
             prefix, paren_content = match.groups()
-            tag = "/*AUTOSENSE*/"
 
             # Find the start of the body in the original content
             body_start = match.end()
