@@ -32,6 +32,28 @@ jobs:
           go vet ./...
           go test ./...
 
+  lint:
+    # golangci-lint bundles staticcheck/revive/gocritic/misspell; config lives
+    # in go/.golangci.yml. `fmt --diff` fails the job on unformatted code.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: false
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.1.6/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" v2.1.6
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Lint
+        working-directory: go
+        run: golangci-lint run ./...
+      - name: Check formatting
+        working-directory: go
+        run: golangci-lint fmt --diff ./...
+
   parity:
     # Regenerate the goldens from the Python reference, then confirm the Go
     # output still matches — catches the two implementations drifting apart.

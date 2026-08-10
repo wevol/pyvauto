@@ -1,0 +1,46 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  # "standard" = errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - misspell    # typos in comments/strings
+    - unconvert   # redundant type conversions
+    - revive      # golint's successor: naming, exported-symbol docs, early returns
+    - gocritic    # broad diagnostic/style checks
+
+  settings:
+    staticcheck:
+      # Drop the QF* "quickfix" family: they are pure style preferences
+      # (De Morgan rewrites, tagged switches) and this code reads fine as-is.
+      checks:
+        - all
+        - -QF1001
+        - -QF1002
+    revive:
+      rules:
+        - name: exported
+          disabled: true  # internal/ packages don't need doc comments on every symbol
+    gocritic:
+      disabled-checks:
+        - ifElseChain    # the parser's regex dispatch chains are clearer flat
+        # False positive here: every strings.Index() call it flags searches for
+        # a tag that the enclosing regex already matched in that same string,
+        # so -1 is unreachable.
+        - offBy1
+
+  exclusions:
+    rules:
+      # Tests write fixtures into t.TempDir(); a failed write surfaces as a
+      # test failure anyway, so demanding an error check adds only noise.
+      - path: _test\.go
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

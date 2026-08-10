@@ -58,6 +58,21 @@ go vet ./...
 go test ./...
 ```
 
+## Lint
+
+CI runs [golangci-lint](https://golangci-lint.run) (v2) with the config in
+`.golangci.yml` — staticcheck, revive, gocritic, misspell, unconvert, plus the
+standard set. To run it locally:
+
+```bash
+brew install golangci-lint      # or: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6
+cd go
+golangci-lint run ./...
+golangci-lint fmt ./...         # --diff to check without rewriting
+```
+
+## Golden fixtures
+
 Golden fixtures live in `testdata/`. Regenerate the expected outputs from the
 Python oracle after an intentional behavior change:
 

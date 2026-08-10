@@ -292,7 +292,7 @@ func buildAutoinstPortLines(ports []Port, afterConns map[string]string, modName 
 		lines[portIdx[k]] += ","
 	}
 	for i, w := range lineWarnings {
-		lines[i] = lines[i] + w
+		lines[i] += w
 	}
 	return strings.Join(lines, "\n")
 }
