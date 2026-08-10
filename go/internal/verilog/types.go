@@ -1,3 +1,6 @@
+// Package verilog parses Verilog/SystemVerilog sources and expands (or
+// deletes) Emacs verilog-mode AUTO tags, mirroring the behaviour of the
+// reference Python implementation in pyvauto.py.
 package verilog
 
 type Port struct {
