@@ -17,7 +17,7 @@ import pytest
 # Add the project root to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from pyvauto import VerilogProject, VerilogExpander
+from pyvauto import VerilogExpander, VerilogProject
 
 FIXTURE_DIR = Path(__file__).parent
 SV_FIXTURES = sorted(FIXTURE_DIR.glob("*.sv"))

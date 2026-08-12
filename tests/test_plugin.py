@@ -28,6 +28,7 @@ TOP = "module top;\n    sub u_sub (\n        /*AUTOINST*/\n    );\nendmodule\n"
 
 
 def _run_vim(script_path):
+    assert VIM is not None  # guaranteed by the module-level skipif
     subprocess.run(
         [VIM, "-u", "NONE", "-N", "-es", "-S", str(script_path)],
         capture_output=True,
@@ -124,6 +125,7 @@ def test_plugin_end_to_end_delete(tmp_path):
 def test_plugin_uses_go_binary_via_g_pyvauto_bin(tmp_path):
     """With g:pyvauto_bin set, :Pyvauto expands via the compiled Go binary
     (no Python) and produces the grouped AUTOINST output."""
+    assert GO is not None  # guaranteed by the skipif above
     binpath = tmp_path / "pyvauto_go"
     build = subprocess.run(
         [GO, "build", "-o", str(binpath), "./cmd/pyvauto"],

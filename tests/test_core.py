@@ -14,11 +14,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from pyvauto import (
-    VerilogPort,
-    VerilogModule,
     RegexVerilogParser,
-    VerilogProject,
     VerilogExpander,
+    VerilogProject,
 )
 
 
@@ -184,7 +182,7 @@ class TestVerilogExpander:
         top_content = """
         module top;
             /*AUTOLOGIC*/
-            
+
             sub_mod u_sub (
                 .out_sig(my_logic_sig)
             );
@@ -449,7 +447,7 @@ class TestBugFixes:
         endmodule
         """
         result = expander.expand_autosense(content, "m.sv")
-        sensitivity_line = [l for l in result.splitlines() if "AUTOSENSE" in l][0]
+        sensitivity_line = next(ln for ln in result.splitlines() if "AUTOSENSE" in ln)
         assert "state" in sensitivity_line
         assert "idle" in sensitivity_line
 
@@ -562,11 +560,11 @@ endmodule
         """
         result = expander.expand_autoinst(top)
         # data_in width mismatch -> that line must contain WARNING
-        warn_lines = [l for l in result.splitlines() if "data_in" in l and "WARNING" in l]
+        warn_lines = [ln for ln in result.splitlines() if "data_in" in ln and "WARNING" in ln]
         assert warn_lines, f"expected WARNING comment on data_in line, got:\n{result}"
         # data_out width matches -> no WARNING
         assert not any(
-            "data_out" in l and "WARNING" in l for l in result.splitlines()
+            "data_out" in ln and "WARNING" in ln for ln in result.splitlines()
         )
 
     def test_get_instantiations_handles_concatenation(self):
@@ -609,7 +607,7 @@ endmodule
         endmodule
         """
         result = expander.expand_autosense(content, "m.sv")
-        sens_line = [l for l in result.splitlines() if "AUTOSENSE" in l][0]
+        sens_line = next(ln for ln in result.splitlines() if "AUTOSENSE" in ln)
         assert "d" in sens_line  # read
         assert " q " not in sens_line and "(q" not in sens_line  # q is the LHS, must not appear
 
@@ -628,7 +626,7 @@ endmodule
         endmodule
         """
         result = expander.expand_autosense(content, "m.sv")
-        sens_line = [l for l in result.splitlines() if "AUTOSENSE" in l][0]
+        sens_line = next(ln for ln in result.splitlines() if "AUTOSENSE" in ln)
         assert "a" in sens_line and "b" in sens_line
 
     def test_autoinst_no_false_warning_when_widths_match(self):
@@ -909,7 +907,7 @@ endmodule
         endmodule
         """
         result = expander.expand_autosense(content, "m.sv")
-        sens_line = [l for l in result.splitlines() if "AUTOSENSE" in l][0]
+        sens_line = next(ln for ln in result.splitlines() if "AUTOSENSE" in ln)
         # a and b are read -> should be in the sensitivity list
         assert "a" in sens_line and "b" in sens_line
         # out is written (LHS) -> must not appear in the sensitivity list
@@ -1008,8 +1006,8 @@ endmodule
         """
         result = expander.expand_autoinst(top, "top.sv")
         # the commented line must not be expanded (still after //)
-        commented = [l for l in result.splitlines() if l.strip().startswith("//")]
-        assert any("u_dead" in l and "/*AUTOINST*/" in l for l in commented)
+        commented = [ln for ln in result.splitlines() if ln.strip().startswith("//")]
+        assert any("u_dead" in ln and "/*AUTOINST*/" in ln for ln in commented)
         # the live instance should expand normally
         assert ".a" in result and ".b" in result
 

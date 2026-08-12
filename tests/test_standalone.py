@@ -5,10 +5,7 @@ This test would fail (RED) while pyvauto.py still depended on parser.py.
 Once the merge was done, it passes (GREEN).
 """
 
-import sys
-import os
 from pathlib import Path
-import importlib.util
 
 
 def test_pyvauto_is_standalone():
@@ -22,7 +19,7 @@ def test_pyvauto_is_standalone():
     pyvauto_path = project_root / "pyvauto.py"
 
     # Read pyvauto.py's content
-    with open(pyvauto_path, "r", encoding="utf-8") as f:
+    with open(pyvauto_path, encoding="utf-8") as f:
         content = f.read()
 
     # Verify: there must be no "from parser import" statement
@@ -50,7 +47,7 @@ def test_pyvauto_imports_only_stdlib():
     project_root = Path(__file__).parent.parent
     pyvauto_path = project_root / "pyvauto.py"
 
-    with open(pyvauto_path, "r", encoding="utf-8") as f:
+    with open(pyvauto_path, encoding="utf-8") as f:
         content = f.read()
 
     # Standard-library module allow-list
