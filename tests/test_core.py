@@ -199,9 +199,7 @@ class TestVerilogExpander:
         start = result.find("/*AUTOARG*/") + len("/*AUTOARG*/")
         end = result.find(");", start)
         region = result[start:end]
-        return "\n".join(
-            ln for ln in region.splitlines() if not ln.strip().startswith("//")
-        )
+        return "\n".join(ln for ln in region.splitlines() if not ln.strip().startswith("//"))
 
     def test_autoarg_regenerates_after_port_removed(self):
         """Re-running AUTOARG must drop a port that was deleted from the body."""
@@ -254,11 +252,7 @@ class TestVerilogExpander:
         assert "// Outputs" in result
         assert "// Inouts" in result
         assert "// Inputs" in result
-        assert (
-            result.index("// Outputs")
-            < result.index("// Inouts")
-            < result.index("// Inputs")
-        )
+        assert result.index("// Outputs") < result.index("// Inouts") < result.index("// Inputs")
         assert result.index("done") < result.index("bus") < result.index("clk")
 
     def test_autoarg_handles_no_space_before_bracket(self):
@@ -563,9 +557,7 @@ endmodule
         warn_lines = [ln for ln in result.splitlines() if "data_in" in ln and "WARNING" in ln]
         assert warn_lines, f"expected WARNING comment on data_in line, got:\n{result}"
         # data_out width matches -> no WARNING
-        assert not any(
-            "data_out" in ln and "WARNING" in ln for ln in result.splitlines()
-        )
+        assert not any("data_out" in ln and "WARNING" in ln for ln in result.splitlines())
 
     def test_get_instantiations_handles_concatenation(self):
         """Bug 4: get_instantiations must parse connections like `.x({a, b})`."""
@@ -982,6 +974,7 @@ endmodule
     def test_strip_comments_preserves_string_literals(self):
         """strip_comments_safely must not eat `//` or `/* */` inside string literals."""
         from pyvauto import strip_comments_safely
+
         src = '$display("http://example.com /* not a comment */");'
         out = strip_comments_safely(src)
         assert "http://example.com" in out

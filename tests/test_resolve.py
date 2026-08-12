@@ -28,8 +28,7 @@ def test_resolve_filename_fast_path_skips_unneeded(tmp_path):
 
 def test_resolve_multi_module_file_resolves_all(tmp_path):
     # One file defines two needed modules; one parse satisfies both.
-    _write(tmp_path, "pair.sv",
-           "module a(input x); endmodule\nmodule b(output y); endmodule\n")
+    _write(tmp_path, "pair.sv", "module a(input x); endmodule\nmodule b(output y); endmodule\n")
     _write(tmp_path, "c.v", "module c(input z); endmodule\n")  # decoy
 
     project = VerilogProject()
@@ -82,21 +81,16 @@ def test_resolve_empty_needed_parses_nothing(tmp_path):
     assert project.modules == {}
 
 
-PYVAUTO = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pyvauto.py"
-)
+PYVAUTO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pyvauto.py")
 
 
 def test_cli_resolves_submodule_from_sibling_file(tmp_path):
     # Sub-module in its own file; top instantiates it with /*AUTOINST*/.
-    _write(tmp_path, "sub.v",
-           "module sub(input clk, output done); endmodule\n")
+    _write(tmp_path, "sub.v", "module sub(input clk, output done); endmodule\n")
     top = _write(
         tmp_path,
         "top.v",
-        "module top;\n"
-        "  sub u_sub (/*AUTOINST*/);\n"
-        "endmodule\n",
+        "module top;\n  sub u_sub (/*AUTOINST*/);\nendmodule\n",
     )
     # Decoy file that must not be needed to expand top.
     _write(tmp_path, "unused.v", "module unused(input q); endmodule\n")
@@ -111,8 +105,8 @@ def test_cli_resolves_submodule_from_sibling_file(tmp_path):
 
     with open(top, encoding="utf-8") as f:
         expanded = f.read()
-    assert ".clk" in expanded and ".done" in expanded   # AUTOINST filled in
-    assert "unused" not in result.stdout                  # decoy not parsed
+    assert ".clk" in expanded and ".done" in expanded  # AUTOINST filled in
+    assert "unused" not in result.stdout  # decoy not parsed
 
 
 def test_resolve_searches_multiple_roots(tmp_path):
@@ -162,14 +156,18 @@ def test_cli_incdir_finds_submodule(tmp_path):
 
     subprocess.run(
         [sys.executable, PYVAUTO, str(top)],
-        cwd=str(other), capture_output=True, text=True,
+        cwd=str(other),
+        capture_output=True,
+        text=True,
     )
     with open(top, encoding="utf-8") as f:
         assert ".clk" not in f.read()
 
     result = subprocess.run(
         [sys.executable, PYVAUTO, "--incdir", str(lib), str(top)],
-        cwd=str(other), capture_output=True, text=True,
+        cwd=str(other),
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0, result.stderr
     with open(top, encoding="utf-8") as f:

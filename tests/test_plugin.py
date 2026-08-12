@@ -53,9 +53,9 @@ def test_plugin_defaults_and_mappings(tmp_path):
     _run_vim(script)
 
     text = result.read_text()
-    assert "script_readable=1" in text          # default path points at a real file
-    assert "has_Pyvauto=2" in text               # command is defined
-    assert "Pyvauto" in text                     # \va maps to :Pyvauto
+    assert "script_readable=1" in text  # default path points at a real file
+    assert "has_Pyvauto=2" in text  # command is defined
+    assert "Pyvauto" in text  # \va maps to :Pyvauto
 
 
 def test_plugin_end_to_end_expansion(tmp_path):
@@ -65,13 +65,7 @@ def test_plugin_end_to_end_expansion(tmp_path):
     top.write_text(TOP)
 
     script = tmp_path / "run.vim"
-    script.write_text(
-        f"source {PLUGIN}\n"
-        f"cd {tmp_path}\n"
-        "edit top.sv\n"
-        "Pyvauto\n"
-        "qa!\n"
-    )
+    script.write_text(f"source {PLUGIN}\ncd {tmp_path}\nedit top.sv\nPyvauto\nqa!\n")
     _run_vim(script)
 
     out = top.read_text()
@@ -94,9 +88,9 @@ def test_plugin_delete_command_and_mappings(tmp_path):
     _run_vim(script)
 
     text = result.read_text()
-    assert "has_NVA=2" in text          # command defined
-    assert "map_nva=:NVA" in text       # \nva maps to :NVA
-    assert "map_F6=:NVA" in text        # <F6> maps to :NVA
+    assert "has_NVA=2" in text  # command defined
+    assert "map_nva=:NVA" in text  # \nva maps to :NVA
+    assert "map_F6=:NVA" in text  # <F6> maps to :NVA
 
 
 def test_plugin_end_to_end_delete(tmp_path):
@@ -106,14 +100,7 @@ def test_plugin_end_to_end_delete(tmp_path):
     top.write_text(TOP)
 
     script = tmp_path / "run.vim"
-    script.write_text(
-        f"source {PLUGIN}\n"
-        f"cd {tmp_path}\n"
-        "edit top.sv\n"
-        "Pyvauto\n"
-        "NVA\n"
-        "qa!\n"
-    )
+    script.write_text(f"source {PLUGIN}\ncd {tmp_path}\nedit top.sv\nPyvauto\nNVA\nqa!\n")
     _run_vim(script)
 
     out = top.read_text()
@@ -142,14 +129,7 @@ def test_plugin_uses_go_binary_via_g_pyvauto_bin(tmp_path):
     top.write_text(TOP)
 
     script = tmp_path / "run.vim"
-    script.write_text(
-        f"let g:pyvauto_bin='{binpath}'\n"
-        f"source {PLUGIN}\n"
-        f"cd {tmp_path}\n"
-        "edit top.sv\n"
-        "Pyvauto\n"
-        "qa!\n"
-    )
+    script.write_text(f"let g:pyvauto_bin='{binpath}'\nsource {PLUGIN}\ncd {tmp_path}\nedit top.sv\nPyvauto\nqa!\n")
     _run_vim(script)
 
     out = top.read_text()
