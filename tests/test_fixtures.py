@@ -49,7 +49,4 @@ def test_fixture_expansion_is_idempotent(expander, sv_path):
     once = expander.expand_all(content, str(sv_path))
     twice = expander.expand_all(once, str(sv_path))
 
-    assert once == twice, (
-        f"{sv_path.name}: expand_all is not idempotent\n"
-        f"--- once ---\n{once}\n--- twice ---\n{twice}"
-    )
+    assert once == twice, f"{sv_path.name}: expand_all is not idempotent\n--- once ---\n{once}\n--- twice ---\n{twice}"

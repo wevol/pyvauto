@@ -24,20 +24,13 @@ def test_pyvauto_is_standalone():
 
     # Verify: there must be no "from parser import" statement
     assert "from parser import" not in content, (
-        "pyvauto.py still depends on parser.py. "
-        "This test is expected to fail (RED) until the merge is done."
+        "pyvauto.py still depends on parser.py. This test is expected to fail (RED) until the merge is done."
     )
 
     # Further: all required classes must be defined inside pyvauto.py
-    assert "class VerilogPort:" in content, (
-        "VerilogPort class should be defined in pyvauto.py"
-    )
-    assert "class VerilogModule:" in content, (
-        "VerilogModule class should be defined in pyvauto.py"
-    )
-    assert "class RegexVerilogParser:" in content, (
-        "RegexVerilogParser class should be defined in pyvauto.py"
-    )
+    assert "class VerilogPort:" in content, "VerilogPort class should be defined in pyvauto.py"
+    assert "class VerilogModule:" in content, "VerilogModule class should be defined in pyvauto.py"
+    assert "class RegexVerilogParser:" in content, "RegexVerilogParser class should be defined in pyvauto.py"
 
 
 def test_pyvauto_imports_only_stdlib():
@@ -54,11 +47,7 @@ def test_pyvauto_imports_only_stdlib():
     stdlib_modules = {"re", "os", "sys", "argparse", "traceback", "typing"}
 
     # Extract all import statements
-    import_lines = [
-        line.strip()
-        for line in content.split("\n")
-        if line.strip().startswith(("import ", "from "))
-    ]
+    import_lines = [line.strip() for line in content.split("\n") if line.strip().startswith(("import ", "from "))]
 
     for line in import_lines:
         # Skip trailing comments

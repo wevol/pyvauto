@@ -12,8 +12,8 @@ from typing import Dict, List, Optional, Set, Union
 
 _STRIP_COMMENTS_RE = re.compile(
     r'"(?:\\.|[^"\\])*"'
-    r'|//[^\n]*'
-    r'|/\*.*?\*/',
+    r"|//[^\n]*"
+    r"|/\*.*?\*/",
     re.DOTALL,
 )
 
@@ -176,9 +176,7 @@ def _widths_mismatch(w1: str, w2: str) -> bool:
 class VerilogPort:
     """A Verilog port definition."""
 
-    def __init__(
-        self, name: str, direction: str, width: str = "", port_type: str = "wire"
-    ):
+    def __init__(self, name: str, direction: str, width: str = "", port_type: str = "wire"):
         self.name = name
         self.direction = direction
         self.width = width
@@ -205,9 +203,7 @@ class RegexVerilogParser:
     """Regex-based Verilog parser."""
 
     def __init__(self):
-        self.module_re = re.compile(
-            r"(?m)^[\t ]*module\s+(\w+)\s*(#\s*\(.*?\))?\s*\((.*?)\)\s*;", re.DOTALL
-        )
+        self.module_re = re.compile(r"(?m)^[\t ]*module\s+(\w+)\s*(#\s*\(.*?\))?\s*\((.*?)\)\s*;", re.DOTALL)
         self.param_re = re.compile(r"(\w+)\s*=\s*([^,)\s]+)")
         # group(4) captures the whole comma-separated name list sharing one
         # direction/type/width (e.g. `input [7:0] a, b, c`). The negative
@@ -242,14 +238,10 @@ class RegexVerilogParser:
 
             # Extract module body: from end of port list ')' to 'endmodule'
             start_pos = match.end()
-            end_module_match = re.search(
-                r"\bendmodule\b", content_no_comments[start_pos:]
-            )
+            end_module_match = re.search(r"\bendmodule\b", content_no_comments[start_pos:])
             module_body = ""
             if end_module_match:
-                module_body = content_no_comments[
-                    start_pos : start_pos + end_module_match.start()
-                ]
+                module_body = content_no_comments[start_pos : start_pos + end_module_match.start()]
 
             module = VerilogModule(name=mod_name, file_path=file_path)
 
@@ -292,9 +284,7 @@ class RegexVerilogParser:
         """Extract Verilog instantiation info."""
         content_no_comments = strip_comments_safely(content)
 
-        inst_pattern = re.compile(
-            r"(\w+)\s+(\w+)\s*(#\s*\(.*?\))?\s*\(([^;]*?)\)\s*;", re.DOTALL
-        )
+        inst_pattern = re.compile(r"(\w+)\s+(\w+)\s*(#\s*\(.*?\))?\s*\(([^;]*?)\)\s*;", re.DOTALL)
 
         insts = []
         for match in inst_pattern.finditer(content_no_comments):
@@ -305,9 +295,7 @@ class RegexVerilogParser:
 
             ports = parse_named_port_connections(port_block)
 
-            insts.append(
-                {"module_name": mod_name, "instance_name": inst_name, "ports": ports}
-            )
+            insts.append({"module_name": mod_name, "instance_name": inst_name, "ports": ports})
         return insts
 
     def get_local_signals(self, content: str, file_path: str) -> Set:
@@ -323,9 +311,7 @@ class RegexVerilogParser:
 
         signals.update(_scan_type_decls(content_no_comments).keys())
 
-        param_pattern = re.compile(
-            r"\b(parameter|localparam)\b\s+(?:.*?\b)?(\w+)\s*=", re.MULTILINE
-        )
+        param_pattern = re.compile(r"\b(parameter|localparam)\b\s+(?:.*?\b)?(\w+)\s*=", re.MULTILINE)
         for m in param_pattern.finditer(content_no_comments):
             signals.add(m.group(2))
 
@@ -404,8 +390,8 @@ class VerilogProject:
                 uniq_roots.append(r)
 
         # One cheap directory listing per root — file names only, no parsing.
-        candidates = []                  # all candidate .v/.sv paths
-        by_basename = {}                 # '<name>' -> path, for the fast-path
+        candidates = []  # all candidate .v/.sv paths
+        by_basename = {}  # '<name>' -> path, for the fast-path
         # Sorted traversal: see add_directory — first-found-wins resolution must
         # not depend on filesystem listing order.
         for path in uniq_roots:
@@ -444,17 +430,11 @@ class VerilogProject:
             if full in parsed:
                 continue
             try:
-                with open(
-                    full, encoding="utf-8", errors="ignore", newline=""
-                ) as fh:
+                with open(full, encoding="utf-8", errors="ignore", newline="") as fh:
                     content = fh.read()
             except Exception:
                 continue
-            prefilter = re.compile(
-                r"\bmodule\s+(?:"
-                + "|".join(re.escape(n) for n in pending)
-                + r")\b"
-            )
+            prefilter = re.compile(r"\bmodule\s+(?:" + "|".join(re.escape(n) for n in pending) + r")\b")
             if not prefilter.search(content):
                 continue
             self._index_file(full, _content=content)
@@ -521,9 +501,7 @@ class VerilogExpander:
         local_widths = self.project.parser.get_local_signal_widths(content, file_path)
 
         def replace_fn(match):
-            mod_name, inst_name, param_override, port_block, autoinst_tag = (
-                match.groups()
-            )
+            mod_name, inst_name, param_override, port_block, autoinst_tag = match.groups()
 
             if mod_name in _INST_SKIP_KEYWORDS:
                 return match.group(0)
@@ -540,26 +518,18 @@ class VerilogExpander:
             # names are reused (bus widths refreshed to the module).
             tag_index = port_block.find(autoinst_tag)
             before_tag = port_block[:tag_index]
-            after_tag = port_block[tag_index + len(autoinst_tag):]
+            after_tag = port_block[tag_index + len(autoinst_tag) :]
 
-            before_conns = parse_named_port_connections(
-                self._strip_comments(before_tag)
-            )
-            after_conns = parse_named_port_connections(
-                self._strip_comments(after_tag)
-            )
+            before_conns = parse_named_port_connections(self._strip_comments(before_tag))
+            after_conns = parse_named_port_connections(self._strip_comments(after_tag))
             claimed = set(before_conns.keys())
 
             all_conns = dict(after_conns)
             all_conns.update(before_conns)
-            self._warn_manual_connection_widths(
-                module, all_conns, mod_name, inst_name
-            )
+            self._warn_manual_connection_widths(module, all_conns, mod_name, inst_name)
 
             ports_to_emit = [p for p in module.ports if p.name not in claimed]
-            port_str = self._build_autoinst_port_lines(
-                ports_to_emit, mod_name, local_widths, after_conns
-            )
+            port_str = self._build_autoinst_port_lines(ports_to_emit, mod_name, local_widths, after_conns)
 
             before_stripped = before_tag.strip()
             if port_str.strip():
@@ -584,9 +554,7 @@ class VerilogExpander:
         for p_name, sig_val in manual_conns.items():
             p_def = next((p for p in module.ports if p.name == p_name), None)
             if not p_def:
-                print(
-                    f"Warning: Port '{p_name}' does not exist in module '{mod_name}'."
-                )
+                print(f"Warning: Port '{p_name}' does not exist in module '{mod_name}'.")
                 continue
 
             sig_width_match = re.search(r"(\[.*?\])$", sig_val)
@@ -599,9 +567,7 @@ class VerilogExpander:
                     f"has '{sig_width}'."
                 )
 
-    def _build_autoinst_port_lines(
-        self, ports_to_emit, mod_name, local_widths, after_conns
-    ):
+    def _build_autoinst_port_lines(self, ports_to_emit, mod_name, local_widths, after_conns):
         """Render the /*AUTOINST*/ connections: group by direction, reuse any
         existing signal's base name (refreshing bus width to the module port),
         and append width-mismatch warning comments. This block is the last
@@ -620,8 +586,7 @@ class VerilogExpander:
             local_w = local_widths.get(p.name, "")
             if existing is None and _widths_mismatch(p.width, local_w):
                 line_warnings[len(lines)] = (
-                    f"  // WARNING: width mismatch — "
-                    f"{mod_name}.{p.name} is {p.width}, local {p.name} is {local_w}"
+                    f"  // WARNING: width mismatch — {mod_name}.{p.name} is {p.width}, local {p.name} is {local_w}"
                 )
             return line
 
@@ -640,9 +605,7 @@ class VerilogExpander:
             if p.direction not in ("output", "inout", "input"):
                 lines.append(format_p(p))
 
-        port_indices = [
-            i for i, line in enumerate(lines) if line.strip().startswith(".")
-        ]
+        port_indices = [i for i, line in enumerate(lines) if line.strip().startswith(".")]
         if port_indices:
             for i in port_indices[:-1]:
                 lines[i] += ","
@@ -676,9 +639,7 @@ class VerilogExpander:
         for masked_match, real_match in self._iter_masked_matches(content, pattern):
             if real_match is None:
                 continue
-            replacements.append(
-                (masked_match.start(), masked_match.end(), replace_fn(real_match))
-            )
+            replacements.append((masked_match.start(), masked_match.end(), replace_fn(real_match)))
 
         if not replacements:
             return content
@@ -728,9 +689,7 @@ class VerilogExpander:
             print(f"  No ports found for {target_mod_name} (or module parse failed)")
             # Just preserve the tag if no ports found
             return (
-                content[: match.start()]
-                + match.group(0).replace(autoarg_tag, "/*AUTOARG*/")
-                + content[match.end() :]
+                content[: match.start()] + match.group(0).replace(autoarg_tag, "/*AUTOARG*/") + content[match.end() :]
             )
 
         # Emacs model: manual args live BEFORE the tag and are preserved; the
@@ -782,9 +741,7 @@ class VerilogExpander:
         headers are a bare comma-separated name list."""
         existing_ports = set()
         if is_ansi:
-            for p_match in self.project.parser.port_re.finditer(
-                self._strip_comments(port_block)
-            ):
+            for p_match in self.project.parser.port_re.finditer(self._strip_comments(port_block)):
                 for name in self.project.parser._port_names(p_match.group(4)):
                     existing_ports.add(name)
         else:
@@ -806,10 +763,7 @@ class VerilogExpander:
             return ""
         if is_ansi:
             # ANSI Mode: full declarations ('direction [width] name'), one per line
-            decls = [
-                f"{p.direction} {f'{p.width} ' if p.width else ''}{p.name}"
-                for p in ports_to_expand
-            ]
+            decls = [f"{p.direction} {f'{p.width} ' if p.width else ''}{p.name}" for p in ports_to_expand]
             return ",\n    ".join(decls)
 
         # Non-ANSI Mode: group by direction with // headers (Emacs style),
@@ -824,11 +778,7 @@ class VerilogExpander:
             members = [p.name for p in ports_to_expand if p.direction == direction]
             if members:
                 groups.append((header, members))
-        others = [
-            p.name
-            for p in ports_to_expand
-            if p.direction not in ("output", "inout", "input")
-        ]
+        others = [p.name for p in ports_to_expand if p.direction not in ("output", "inout", "input")]
         if others:
             groups.append((None, others))
 
@@ -863,9 +813,7 @@ class VerilogExpander:
             lines.append(curr_line.rstrip())
         return "\n".join(lines)
 
-    def _expand_auto_signals(
-        self, content: str, file_path: str, tag_name: str, signal_type: str
-    ) -> str:
+    def _expand_auto_signals(self, content: str, file_path: str, tag_name: str, signal_type: str) -> str:
         """Shared helper: expand AUTOWIRE or AUTOLOGIC."""
         tag_regex = rf"(/\*{tag_name}\*/)"
         regex = re.compile(
@@ -882,9 +830,7 @@ class VerilogExpander:
         tag, existing_block = match.groups()
         content_for_signals = content.replace(existing_block or "", "")
         insts = self.project.parser.get_instantiations(content, file_path)
-        new_signals = self._collect_auto_decls(
-            content_for_signals, insts, "output", signal_type, semicolon=True
-        )
+        new_signals = self._collect_auto_decls(content_for_signals, insts, "output", signal_type, semicolon=True)
         for decl in new_signals:
             print(f"  {tag_name}: {decl}")
 
@@ -928,9 +874,7 @@ class VerilogExpander:
 
         manual_decls: Dict[str, str] = {}
         if check_manual_widths:
-            for p_match in self.project.parser.port_re.finditer(
-                self._strip_comments(content_for_signals)
-            ):
+            for p_match in self.project.parser.port_re.finditer(self._strip_comments(content_for_signals)):
                 if p_match.group(1) == filter_direction:
                     for name in self.project.parser._port_names(p_match.group(4)):
                         manual_decls[name] = p_match.group(3) or ""
@@ -942,9 +886,7 @@ class VerilogExpander:
             if not module_def:
                 continue
             for p_name, s_name in inst["ports"].items():
-                p_def = next(
-                    (p for p in module_def.ports if p.name == p_name), None
-                )
+                p_def = next((p for p in module_def.ports if p.name == p_name), None)
                 if not (p_def and p_def.direction == filter_direction):
                     continue
                 base = s_name.split("[")[0].strip()
@@ -958,9 +900,7 @@ class VerilogExpander:
                     if decl not in decls:
                         decls.append(decl)
                         local_signals.add(base)
-                elif check_manual_widths and base in manual_decls and _widths_mismatch(
-                    p_def.width, manual_decls[base]
-                ):
+                elif check_manual_widths and base in manual_decls and _widths_mismatch(p_def.width, manual_decls[base]):
                     print(
                         f"Warning: Width mismatch for manual {filter_direction} '{base}'. "
                         f"Target port '{p_name}' of module '{inst['module_name']}' "
@@ -968,9 +908,7 @@ class VerilogExpander:
                     )
         return decls
 
-    def _expand_auto_port(
-        self, content: str, file_path: str, tag_name: str, direction: str
-    ) -> str:
+    def _expand_auto_port(self, content: str, file_path: str, tag_name: str, direction: str) -> str:
         """Generic expander for /*AUTOINPUT*/ or /*AUTOOUTPUT*/.
         Handles both ANSI (port list) and Non-ANSI (body) contexts."""
         # 1. ANSI port list context
@@ -1006,8 +944,12 @@ class VerilogExpander:
 
             insts = self.project.parser.get_instantiations(content, file_path)
             new_decls = self._collect_auto_decls(
-                content_for_signals, insts, direction, direction,
-                semicolon=False, check_manual_widths=True,
+                content_for_signals,
+                insts,
+                direction,
+                direction,
+                semicolon=False,
+                check_manual_widths=True,
             )
 
             head = port_block[:tag_index]
@@ -1056,8 +998,12 @@ class VerilogExpander:
 
         insts = self.project.parser.get_instantiations(content, file_path)
         new_decls = self._collect_auto_decls(
-            content_for_signals, insts, direction, direction,
-            semicolon=True, check_manual_widths=True,
+            content_for_signals,
+            insts,
+            direction,
+            direction,
+            semicolon=True,
+            check_manual_widths=True,
         )
 
         if not new_decls:
@@ -1111,11 +1057,7 @@ class VerilogExpander:
             # Filter unique signals that exist in project and aren't keywords
             detected_sigs = set()
             for name in all_ids:
-                if (
-                    name in local_signals
-                    and name not in _AUTOSENSE_KEYWORDS
-                    and self._signal_is_read(name, clean_body)
-                ):
+                if name in local_signals and name not in _AUTOSENSE_KEYWORDS and self._signal_is_read(name, clean_body):
                     detected_sigs.add(name)
 
             if not detected_sigs:
@@ -1149,9 +1091,7 @@ class VerilogExpander:
         body_candidate = full_content[start_pos:].strip()
         if body_candidate.startswith("begin"):
             stack = 0
-            for m in re.finditer(
-                r"\b(begin|end|case|endcase|fork|join)\b", body_candidate
-            ):
+            for m in re.finditer(r"\b(begin|end|case|endcase|fork|join)\b", body_candidate):
                 kw = m.group(1)
                 if kw in ("begin", "case", "fork"):
                     stack += 1
@@ -1206,9 +1146,7 @@ class VerilogExpander:
 
     def _per_module_block(self, content, file_path, block_fn):
         """Apply block_fn(block_text, file_path) to each module…endmodule block."""
-        return _MODULE_BLOCK_RE.sub(
-            lambda m: block_fn(m.group(0), file_path), content
-        )
+        return _MODULE_BLOCK_RE.sub(lambda m: block_fn(m.group(0), file_path), content)
 
     def expand_all(self, content: str, file_path: str = "") -> str:
         return self._per_module_block(content, file_path, self.expand_module_block)
@@ -1323,10 +1261,7 @@ def main():
             if not args.delete:
                 # Resolve only the sub-modules THIS file instantiates, searching
                 # the file's own directory plus any --incdir dirs.
-                needed = {
-                    inst["module_name"]
-                    for inst in project.parser.get_instantiations(content, fpath)
-                }
+                needed = {inst["module_name"] for inst in project.parser.get_instantiations(content, fpath)}
                 roots = [os.path.dirname(fpath) or ".", *args.incdir]
                 project.resolve(roots, needed)
 
