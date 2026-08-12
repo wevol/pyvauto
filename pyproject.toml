@@ -13,4 +13,42 @@ dependencies = []
 dev = [
     "pyright>=1.1.411",
     "pytest>=9.1.1",
+    "ruff>=0.12.7",
 ]
+
+# Mirrors go/.golangci.yml: one linter+formatter for the whole tree, with every
+# relaxation annotated. Run `uv run ruff check .` and `uv run ruff format .`.
+[tool.ruff]
+line-length = 120
+# pyvauto.py must keep running on Python 3.6.8+ (stdlib only), so pyupgrade
+# rules must not rewrite it to newer syntax. py37 is ruff's lowest target and
+# is the closest available guard; the dev env pin in [project] is separate.
+target-version = "py37"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # import sorting
+    "B",    # bugbear: likely bugs
+    "C4",   # comprehension simplifications
+    "UP",   # pyupgrade (bounded by target-version above)
+    "SIM",  # simplifications
+    "RUF",  # ruff's own checks
+]
+ignore = [
+    # Same call as gocritic's ifElseChain on the Go side: collapsing these
+    # branches into a ternary produces a line that reads worse than the block.
+    "SIM108",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests build Verilog fixtures as long inline string literals and assert on
+# them; wrapping those hurts readability more than the long line does.
+"tests/*" = ["E501"]
+
+[tool.pyright]
+include = ["pyvauto.py", "tests"]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"

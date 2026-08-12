@@ -6,6 +6,22 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    # Python counterpart to the Go workflow's lint job. Config lives in
+    # pyproject.toml under [tool.ruff] and [tool.pyright].
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Sync dependencies
+        run: uv sync
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Pyright
+        run: uv run pyright
+
   test:
     runs-on: ubuntu-latest
     steps:

@@ -1,10 +1,9 @@
-import re
-import os
 import argparse
+import os
+import re
 import sys
 import traceback
-from typing import Optional, Dict, List, Set, Union
-
+from typing import Dict, List, Optional, Set, Union
 
 # ============================================================================
 # Shared helpers (string-aware comment stripping & depth-counted port parsing)
@@ -362,7 +361,6 @@ class VerilogProject:
             if _content is None:
                 with open(
                     full_path,
-                    "r",
                     encoding="utf-8",
                     errors="ignore",
                     newline="",
@@ -447,7 +445,7 @@ class VerilogProject:
                 continue
             try:
                 with open(
-                    full, "r", encoding="utf-8", errors="ignore", newline=""
+                    full, encoding="utf-8", errors="ignore", newline=""
                 ) as fh:
                     content = fh.read()
             except Exception:
@@ -596,7 +594,9 @@ class VerilogExpander:
 
             if _widths_mismatch(p_def.width, sig_width):
                 print(
-                    f"Warning: Width mismatch for port '{p_name}' in instance '{inst_name}'. Module has '{p_def.width}', connection has '{sig_width}'."
+                    f"Warning: Width mismatch for port '{p_name}' in instance "
+                    f"'{inst_name}'. Module has '{p_def.width}', connection "
+                    f"has '{sig_width}'."
                 )
 
     def _build_autoinst_port_lines(
@@ -1111,14 +1111,17 @@ class VerilogExpander:
             # Filter unique signals that exist in project and aren't keywords
             detected_sigs = set()
             for name in all_ids:
-                if name in local_signals and name not in _AUTOSENSE_KEYWORDS:
-                    if self._signal_is_read(name, clean_body):
-                        detected_sigs.add(name)
+                if (
+                    name in local_signals
+                    and name not in _AUTOSENSE_KEYWORDS
+                    and self._signal_is_read(name, clean_body)
+                ):
+                    detected_sigs.add(name)
 
             if not detected_sigs:
                 return match.group(0)
 
-            sorted_sigs = sorted(list(detected_sigs))
+            sorted_sigs = sorted(detected_sigs)
             sig_list = " or ".join(sorted_sigs)
 
             # Replace the tag *and any previously-generated list that follows
@@ -1314,7 +1317,7 @@ def main():
                 print(f"Skip: {fpath} (not found)")
                 continue
 
-            with open(fpath, "r", encoding="utf-8", newline="") as f:
+            with open(fpath, encoding="utf-8", newline="") as f:
                 content = f.read()
 
             if not args.delete:
@@ -1324,7 +1327,7 @@ def main():
                     inst["module_name"]
                     for inst in project.parser.get_instantiations(content, fpath)
                 }
-                roots = [os.path.dirname(fpath) or "."] + args.incdir
+                roots = [os.path.dirname(fpath) or ".", *args.incdir]
                 project.resolve(roots, needed)
 
             print(f"{'Deleting' if args.delete else 'Expanding'}: {fpath}")
