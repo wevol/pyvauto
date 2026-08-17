@@ -1,0 +1,12 @@
+# Repo default: everything git detects as text is stored with LF, and checked
+# out with LF on every platform. pyvauto.py and tests/test_core.py used to be
+# the only CRLF sources in the tree; this keeps them from drifting back.
+* text=auto eol=lf
+
+# Verilog fixtures and their golden outputs are exempt. Several of them mix
+# CRLF and LF *within a single file* on purpose, to exercise the tool's
+# line-ending handling — normalizing them in either direction breaks the test.
+# -text tells git to leave the committed bytes exactly as they are.
+*.sv     -text
+*.v      -text
+*.golden -text
