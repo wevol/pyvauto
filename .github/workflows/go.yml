@@ -20,6 +20,9 @@ on:
 jobs:
   go-test:
     runs-on: ubuntu-latest
+    # 10 minutes is ~15x the observed runtime; it exists to cap a hung
+    # step (a stuck apt mirror once burned 20 min) against the 6h default.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -36,6 +39,7 @@ jobs:
     # golangci-lint bundles staticcheck/revive/gocritic/misspell; config lives
     # in go/.golangci.yml. `fmt --diff` fails the job on unformatted code.
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -58,6 +62,7 @@ jobs:
     # Regenerate the goldens from the Python reference, then confirm the Go
     # output still matches — catches the two implementations drifting apart.
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
